@@ -12,6 +12,8 @@
 @required
 // Called when the video player has initialized.
 - (void)videoPlayerDidInitializeWithDuration:(int64_t)duration size:(CGSize)size;
+// Called when the video player has loaded a new URL.
+- (void)videoPlayerDidLoadUrlWithDuration:(int64_t)duration size:(CGSize)size;
 // Called if there is an error in video load or playback.
 - (void)videoPlayerDidErrorWithMessage:(NSString *)errorMessage;
 /// Called when the video player plays to the end and then stops (i.e., looping is not enabled).

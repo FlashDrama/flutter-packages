@@ -6,6 +6,9 @@
 .dart_tool/
 .vscode/
 *.iml
+.fvm
+.fvmrc
+.gitignore
 
 # Gradle?
 .uuid

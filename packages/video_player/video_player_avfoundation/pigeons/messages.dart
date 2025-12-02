@@ -72,4 +72,9 @@ abstract class VideoPlayerInstanceApi {
   void seekTo(int position);
   void pause();
   void dispose();
+  @async
+  @ObjCSelector('loadUrl:httpHeaders:')
+  void loadUrl(String url, Map<String, String> httpHeaders);
+  @ObjCSelector('isPictureInPictureActive')
+  bool isPictureInPictureActive();
 }

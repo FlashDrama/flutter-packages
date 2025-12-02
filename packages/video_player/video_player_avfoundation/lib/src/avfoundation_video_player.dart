@@ -172,6 +172,21 @@ class AVFoundationVideoPlayer extends VideoPlayerPlatform {
   }
 
   @override
+  Future<void> loadUrl(int playerId, String url, {Map<String, String>? httpHeaders}) async {
+    return _playerWith(id: playerId).loadUrl(url, httpHeaders ?? <String, String>{});
+  }
+
+  @override
+  Future<bool> isPictureInPictureActive(int playerId) async {
+    final VideoPlayerViewState? viewState = playerViewStates[playerId];
+    // Only platform views support PiP.
+    if (viewState is! VideoPlayerPlatformViewState) {
+      return false;
+    }
+    return _playerWith(id: playerId).isPictureInPictureActive();
+  }
+
+  @override
   Stream<VideoEvent> videoEventsFor(int playerId) {
     return _eventChannelFor(playerId).receiveBroadcastStream().map((
       dynamic event,
@@ -180,6 +195,14 @@ class AVFoundationVideoPlayer extends VideoPlayerPlatform {
       return switch (map['event']) {
         'initialized' => VideoEvent(
           eventType: VideoEventType.initialized,
+          duration: Duration(milliseconds: map['duration'] as int),
+          size: Size(
+            (map['width'] as num?)?.toDouble() ?? 0.0,
+            (map['height'] as num?)?.toDouble() ?? 0.0,
+          ),
+        ),
+        'urlLoaded' => VideoEvent(
+          eventType: VideoEventType.urlLoaded,
           duration: Duration(milliseconds: map['duration'] as int),
           size: Size(
             (map['width'] as num?)?.toDouble() ?? 0.0,

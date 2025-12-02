@@ -5,6 +5,7 @@
 #import "../video_player_avfoundation/include/video_player_avfoundation/FVPNativeVideoView.h"
 
 #import <AVFoundation/AVFoundation.h>
+#import <AVKit/AVKit.h>
 
 @interface FVPPlayerView : UIView
 @end
@@ -21,6 +22,7 @@
 
 @interface FVPNativeVideoView ()
 @property(nonatomic) FVPPlayerView *playerView;
+@property(nonatomic, strong) AVPictureInPictureController *pipController;
 @end
 
 @implementation FVPNativeVideoView
@@ -28,11 +30,27 @@
   if (self = [super init]) {
     _playerView = [[FVPPlayerView alloc] init];
     [_playerView setPlayer:player];
+
+    // Setup Picture-in-Picture for automatic background transition
+    if (@available(iOS 14.2, *)) {
+      if ([AVPictureInPictureController isPictureInPictureSupported]) {
+        AVPlayerLayer *playerLayer = (AVPlayerLayer *)[_playerView layer];
+        _pipController = [[AVPictureInPictureController alloc] initWithPlayerLayer:playerLayer];
+        _pipController.canStartPictureInPictureAutomaticallyFromInline = YES;
+      }
+    }
   }
   return self;
 }
 
 - (FVPPlayerView *)view {
   return self.playerView;
+}
+
+- (BOOL)isPictureInPictureActive {
+  if (@available(iOS 14.2, *)) {
+    return self.pipController.pictureInPictureActive;
+  }
+  return NO;
 }
 @end
