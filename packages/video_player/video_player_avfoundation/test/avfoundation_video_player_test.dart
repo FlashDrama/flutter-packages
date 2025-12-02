@@ -551,6 +551,88 @@ void main() {
       expect(position, const Duration(milliseconds: positionMilliseconds));
     });
 
+    group('isPictureInPictureActive', () {
+      test('returns false for texture view', () async {
+        final (
+          AVFoundationVideoPlayer player,
+          MockAVFoundationVideoPlayerApi api,
+          MockVideoPlayerInstanceApi playerApi,
+        ) = setUpMockPlayer(playerId: 1);
+
+        const int newPlayerId = 2;
+        const int textureId = 100;
+        when(api.createForTextureView(any)).thenAnswer(
+          (_) async =>
+              TexturePlayerIds(playerId: newPlayerId, textureId: textureId),
+        );
+
+        await player.createWithOptions(
+          VideoCreationOptions(
+            dataSource: DataSource(
+              sourceType: DataSourceType.file,
+              uri: 'file:///foo/bar',
+            ),
+            viewType: VideoViewType.textureView,
+          ),
+        );
+
+        final bool isActive = await player.isPictureInPictureActive(newPlayerId);
+        expect(isActive, false);
+        verifyNever(playerApi.isPictureInPictureActive());
+      });
+
+      test('queries native for platform view', () async {
+        final (
+          AVFoundationVideoPlayer player,
+          MockAVFoundationVideoPlayerApi api,
+          MockVideoPlayerInstanceApi playerApi,
+        ) = setUpMockPlayer(playerId: 1);
+
+        const int newPlayerId = 2;
+        when(api.createForPlatformView(any)).thenAnswer((_) async => newPlayerId);
+        when(playerApi.isPictureInPictureActive()).thenAnswer((_) async => true);
+
+        await player.createWithOptions(
+          VideoCreationOptions(
+            dataSource: DataSource(
+              sourceType: DataSourceType.file,
+              uri: 'file:///foo/bar',
+            ),
+            viewType: VideoViewType.platformView,
+          ),
+        );
+
+        final bool isActive = await player.isPictureInPictureActive(newPlayerId);
+        expect(isActive, true);
+        verify(playerApi.isPictureInPictureActive());
+      });
+
+      test('returns false when PiP is not active', () async {
+        final (
+          AVFoundationVideoPlayer player,
+          MockAVFoundationVideoPlayerApi api,
+          MockVideoPlayerInstanceApi playerApi,
+        ) = setUpMockPlayer(playerId: 1);
+
+        const int newPlayerId = 2;
+        when(api.createForPlatformView(any)).thenAnswer((_) async => newPlayerId);
+        when(playerApi.isPictureInPictureActive()).thenAnswer((_) async => false);
+
+        await player.createWithOptions(
+          VideoCreationOptions(
+            dataSource: DataSource(
+              sourceType: DataSourceType.file,
+              uri: 'file:///foo/bar',
+            ),
+            viewType: VideoViewType.platformView,
+          ),
+        );
+
+        final bool isActive = await player.isPictureInPictureActive(newPlayerId);
+        expect(isActive, false);
+      });
+    });
+
     test('videoEventsFor', () async {
       final (
         AVFoundationVideoPlayer player,

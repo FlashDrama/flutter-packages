@@ -15,6 +15,8 @@
 #import <Flutter/Flutter.h>
 #endif
 
+@class FVPNativeVideoView;
+
 NS_ASSUME_NONNULL_BEGIN
 
 /// FVPVideoPlayer manages video playback using AVPlayer.
@@ -35,6 +37,9 @@ NS_ASSUME_NONNULL_BEGIN
 @property(nonatomic, nullable) NSObject<FVPVideoEventListener> *eventListener;
 /// A block that will be called when dispose is called.
 @property(nonatomic, nullable, copy) void (^onDisposed)(void);
+/// The native video view associated with this player for platform view mode.
+/// This is used to query Picture-in-Picture state.
+@property(nonatomic, weak, nullable) FVPNativeVideoView *nativeVideoView;
 
 /// Initializes a new instance of FVPVideoPlayer with the given AVPlayerItem, AV factory, and view
 /// provider.

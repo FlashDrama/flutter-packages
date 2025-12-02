@@ -8,6 +8,7 @@
 #import <GLKit/GLKit.h>
 
 #import "./include/video_player_avfoundation/AVAssetTrackUtils.h"
+#import "./include/video_player_avfoundation/FVPNativeVideoView.h"
 
 static void *timeRangeContext = &timeRangeContext;
 static void *statusContext = &statusContext;
@@ -156,6 +157,91 @@ static NSDictionary<NSString *, NSValue *> *FVPGetPlayerItemObservations(void) {
   [self.eventListener videoPlayerWasDisposed];
 }
 
+- (void)loadUrl:(NSString *)url
+    httpHeaders:(NSDictionary<NSString *, NSString *> *)httpHeaders
+     completion:(void (^)(FlutterError *_Nullable))completion {
+  // 1. Remove observers from the old item
+  AVPlayerItem *oldItem = self.player.currentItem;
+  if (oldItem && _listenersRegistered) {
+    FVPRemoveKeyValueObservers(self, FVPGetPlayerItemObservations(), oldItem);
+    [[NSNotificationCenter defaultCenter] removeObserver:self
+                                                    name:AVPlayerItemDidPlayToEndTimeNotification
+                                                  object:oldItem];
+    [oldItem removeOutput:_videoOutput];
+  }
+
+  // 2. Create new AVURLAsset with HTTP headers if provided
+  NSURL *videoURL = [NSURL URLWithString:url];
+  if (!videoURL) {
+    if (completion) {
+      completion([FlutterError errorWithCode:@"video_player"
+                                      message:@"Invalid URL"
+                                      details:url]);
+    }
+    return;
+  }
+
+  NSDictionary *assetOptions = nil;
+  if (httpHeaders && httpHeaders.count > 0) {
+    assetOptions = @{@"AVURLAssetHTTPHeaderFieldsKey": httpHeaders};
+  }
+
+  AVURLAsset *asset = [AVURLAsset URLAssetWithURL:videoURL options:assetOptions];
+  AVPlayerItem *newItem = [AVPlayerItem playerItemWithAsset:asset];
+
+  // 3. Replace the current item and track it for URL loading
+  _pendingItem = newItem;
+  [self.player replaceCurrentItemWithPlayerItem:newItem];
+
+  // 4. Register observers for the new item
+  if (_listenersRegistered) {
+    FVPRegisterKeyValueObservers(self, FVPGetPlayerItemObservations(), newItem);
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(itemDidPlayToEndTime:)
+                                                 name:AVPlayerItemDidPlayToEndTimeNotification
+                                               object:newItem];
+  }
+
+  // 5. Load asset asynchronously
+  NSArray *assetKeys = @[@"tracks", @"duration", @"playable"];
+  __weak typeof(self) weakSelf = self;
+  [asset loadValuesAsynchronouslyForKeys:assetKeys completionHandler:^{
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (!strongSelf || strongSelf->_disposed) {
+      if (completion) {
+        completion([FlutterError errorWithCode:@"video_player"
+                                        message:@"Player was disposed"
+                                        details:nil]);
+      }
+      return;
+    }
+
+    dispatch_async(dispatch_get_main_queue(), ^{
+      // Check loading status for each key
+      for (NSString *key in assetKeys) {
+        NSError *error = nil;
+        AVKeyValueStatus status = [asset statusOfValueForKey:key error:&error];
+        if (status == AVKeyValueStatusFailed) {
+          if (completion) {
+            completion([FlutterError errorWithCode:@"video_player"
+                                            message:[NSString stringWithFormat:@"Failed to load %@", key]
+                                            details:error.localizedDescription]);
+          }
+          return;
+        }
+      }
+
+      // URL loading will complete automatically through KVO when the new item becomes ready.
+      // The reportStatusForPlayerItem: method will be called via observeValueForKeyPath:
+      // when the item's status changes to AVPlayerItemStatusReadyToPlay.
+
+      if (completion) {
+        completion(nil);
+      }
+    });
+  }];
+}
+
 - (void)setEventListener:(NSObject<FVPVideoEventListener> *)eventListener {
   _eventListener = eventListener;
   // The first time an event listener is set, set up video event listeners to relay status changes
@@ -286,9 +372,21 @@ NS_INLINE CGFloat radiansToDegrees(CGFloat radians) {
       break;
     case AVPlayerItemStatusReadyToPlay:
       if (!_isInitialized) {
+        // Initial initialization
         [item addOutput:_videoOutput];
         [self reportInitialized];
         [self updatePlayingState];
+      } else if (item == _pendingItem) {
+        // URL loading via loadUrl (legitimate)
+        _pendingItem = nil;
+        [item addOutput:_videoOutput];
+        [self reportUrlLoaded];
+        [self updatePlayingState];
+      } else {
+        // Unexpected URL loading event - likely a bug where initialize() was called multiple times
+        NSAssert(NO, @"Unexpected URL loading event for an already initialized player. "
+                     @"This typically indicates that initialize() was called multiple times, "
+                     @"which is not supported.");
       }
       break;
   }
@@ -373,6 +471,15 @@ NS_INLINE CGFloat radiansToDegrees(CGFloat radians) {
                                                       size:currentItem.presentationSize];
 }
 
+- (void)reportUrlLoaded {
+  AVPlayerItem *currentItem = self.player.currentItem;
+  NSAssert(currentItem.status == AVPlayerItemStatusReadyToPlay,
+           @"reportUrlLoaded was called when the item wasn't ready to play.");
+
+  [self.eventListener videoPlayerDidLoadUrlWithDuration:self.duration
+                                                   size:currentItem.presentationSize];
+}
+
 #pragma mark - FVPVideoPlayerInstanceApi
 
 - (void)playWithError:(FlutterError *_Nullable *_Nonnull)error {
@@ -428,6 +535,14 @@ NS_INLINE CGFloat radiansToDegrees(CGFloat radians) {
   // `[AVPlayerItem duration]` can be `kCMTimeIndefinite`,
   // use `[[AVPlayerItem asset] duration]` instead.
   return FVPCMTimeToMillis([[[_player currentItem] asset] duration]);
+}
+
+- (nullable NSNumber *)isPictureInPictureActive:(FlutterError *_Nullable *_Nonnull)error {
+  if (self.nativeVideoView) {
+    return @(self.nativeVideoView.isPictureInPictureActive);
+  }
+  // For texture-based players, PiP is not supported.
+  return @(NO);
 }
 
 @end

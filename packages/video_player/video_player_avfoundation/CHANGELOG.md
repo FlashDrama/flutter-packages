@@ -1,3 +1,7 @@
+## NEXT
+
+* Adds `isPictureInPictureActive` method to check if Picture-in-Picture mode is active (iOS only with platform views).
+
 ## 2.8.7
 
 * Updates to Pigeon 26.

@@ -32,6 +32,12 @@ NS_ASSUME_NONNULL_BEGIN
 /// again.
 @property(nonatomic, readonly) BOOL isInitialized;
 
+/// The AVPlayerItem that was created by loadUrl and is pending initialization.
+///
+/// This is used to distinguish between legitimate URL loading via loadUrl and
+/// unexpected duplicate initialized events (which would indicate a bug).
+@property(nonatomic, nullable) AVPlayerItem *pendingItem;
+
 /// Updates the playing state of the video player.
 - (void)updatePlayingState;
 @end

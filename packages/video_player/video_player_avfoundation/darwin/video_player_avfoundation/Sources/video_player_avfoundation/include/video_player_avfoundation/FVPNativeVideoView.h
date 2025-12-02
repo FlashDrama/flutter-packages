@@ -17,6 +17,9 @@
 #else
 @interface FVPNativeVideoView : NSView
 #endif
+/// Returns whether Picture-in-Picture mode is currently active.
+/// This property is only meaningful on iOS 14.2+. Returns NO on macOS.
+@property(nonatomic, readonly) BOOL isPictureInPictureActive;
 /// Initializes a new instance of a native view.
 /// It creates a video view instance and sets the provided AVPlayer instance to it.
 - (instancetype)initWithPlayer:(AVPlayer *)player;

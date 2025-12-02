@@ -153,6 +153,31 @@ abstract class VideoPlayerPlatform extends PlatformInterface {
   bool isAudioTrackSupportAvailable() {
     return false;
   }
+
+  /// Loads a new video from the specified URL without disposing the player.
+  ///
+  /// This method is currently only supported on iOS and macOS platforms
+  /// when using platform views (viewType: VideoViewType.platformView).
+  /// On unsupported platforms, this method will throw [UnimplementedError].
+  ///
+  /// The player's current state (volume, playback speed, looping) is preserved.
+  ///
+  /// Throws a [PlatformException] if the URL is invalid or cannot be loaded.
+  Future<void> loadUrl(int playerId, String url, {Map<String, String>? httpHeaders}) {
+    throw UnimplementedError('loadUrl() has not been implemented.');
+  }
+
+  /// Returns whether Picture-in-Picture mode is currently active for the player.
+  ///
+  /// This method is currently only supported on iOS when using platform views
+  /// (viewType: VideoViewType.platformView). On unsupported platforms or view
+  /// types, this method returns `false`.
+  ///
+  /// Returns `true` if the video is currently playing in Picture-in-Picture mode,
+  /// `false` otherwise.
+  Future<bool> isPictureInPictureActive(int playerId) {
+    return Future<bool>.value(false);
+  }
 }
 
 class _PlaceholderImplementation extends VideoPlayerPlatform {}
@@ -336,6 +361,13 @@ enum VideoEventType {
   ///
   /// A maximum of one event of this type may be emitted per instance.
   initialized,
+
+  /// The video has loaded a new URL.
+  ///
+  /// This event is emitted when a new video is loaded via loadUrl()
+  /// without disposing the player. Multiple events of this type may be
+  /// emitted per instance.
+  urlLoaded,
 
   /// The playback has ended.
   completed,

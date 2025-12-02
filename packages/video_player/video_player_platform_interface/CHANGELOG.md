@@ -1,6 +1,7 @@
 ## NEXT
 
 * Updates minimum supported SDK version to Flutter 3.32/Dart 3.8.
+* Adds `isPictureInPictureActive` method to check if Picture-in-Picture mode is active.
 
 ## 6.6.0
 

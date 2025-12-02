@@ -407,6 +407,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   Timer? _timer;
   bool _isDisposed = false;
   Completer<void>? _creatingCompleter;
+  Completer<void>? _loadingUrlCompleter;
   StreamSubscription<dynamic>? _eventSubscription;
   _VideoAppLifeCycleObserver? _lifeCycleObserver;
 
@@ -415,9 +416,12 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   static const int kUninitializedPlayerId = -1;
   int _playerId = kUninitializedPlayerId;
 
-  /// This is just exposed for testing. It shouldn't be used by anyone depending
-  /// on the plugin.
-  @visibleForTesting
+  /// The unique identifier for this video player.
+  ///
+  /// Returns [kUninitializedPlayerId] if the controller has not been initialized yet.
+  ///
+  /// This ID can be used to access platform-specific resources, such as
+  /// AVPlayerLayer on iOS/macOS when using platform views.
   int get playerId => _playerId;
 
   /// Attempts to open the given [dataSource] and load metadata about the video.
@@ -512,6 +516,22 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
           _applyLooping();
           _applyVolume();
           _applyPlayPause();
+        case VideoEventType.urlLoaded:
+          value = value.copyWith(
+            duration: event.duration,
+            size: event.size,
+            rotationCorrection: event.rotationCorrection,
+            isInitialized: event.duration != null,
+            errorDescription: null,
+            isCompleted: false,
+          );
+          if (_loadingUrlCompleter != null && !_loadingUrlCompleter!.isCompleted) {
+            _loadingUrlCompleter!.complete(null);
+            _loadingUrlCompleter = null;
+          }
+          _applyLooping();
+          _applyVolume();
+          _applyPlayPause();
         case VideoEventType.completed:
           // In this case we need to stop _timer, set isPlaying=false, and
           // position=value.duration. Instead of setting the values directly,
@@ -550,6 +570,10 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
       if (!initializingCompleter.isCompleted) {
         initializingCompleter.completeError(obj);
       }
+      if (_loadingUrlCompleter != null && !_loadingUrlCompleter!.isCompleted) {
+        _loadingUrlCompleter!.completeError(obj);
+        _loadingUrlCompleter = null;
+      }
     }
 
     _eventSubscription = _videoPlayerPlatform
@@ -574,6 +598,18 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
       }
       _lifeCycleObserver?.dispose();
     }
+
+    // Cancel any pending loadUrl operation
+    if (_loadingUrlCompleter != null && !_loadingUrlCompleter!.isCompleted) {
+      _loadingUrlCompleter!.completeError(
+        PlatformException(
+          code: 'video_player',
+          message: 'Player was disposed during loadUrl',
+        ),
+      );
+      _loadingUrlCompleter = null;
+    }
+
     _isDisposed = true;
     super.dispose();
   }
@@ -733,6 +769,89 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
 
     value = value.copyWith(playbackSpeed: speed);
     await _applyPlaybackSpeed();
+  }
+
+  /// Loads a new video from the specified URL without disposing the controller.
+  ///
+  /// **IMPORTANT**: This method only works with [VideoViewType.platformView].
+  /// If called with other view types, a warning will be logged and the method
+  /// will return without doing anything.
+  ///
+  /// This is more efficient than creating a new controller as it avoids player
+  /// instance recreation. The video's volume, playback speed, and looping state
+  /// are preserved, but playback state (position, buffering, etc.) is reset.
+  ///
+  /// The video will automatically start playing after loading.
+  ///
+  /// Currently only supported on iOS and macOS.
+  ///
+  /// Example:
+  /// ```dart
+  /// final controller = VideoPlayerController.networkUrl(
+  ///   Uri.parse('https://example.com/video1.mp4'),
+  ///   videoPlayerOptions: VideoPlayerOptions(
+  ///     viewType: VideoViewType.platformView,
+  ///   ),
+  /// );
+  /// await controller.initialize();
+  /// await controller.loadUrl('https://example.com/video2.mp4');
+  /// ```
+  Future<void> loadUrl(String url, {Map<String, String>? httpHeaders}) async {
+    if (_isDisposedOrNotInitialized) {
+      return;
+    }
+
+    // platformView以外では警告を出して何もしない
+    if (viewType != VideoViewType.platformView) {
+      debugPrint(
+        'WARNING: VideoPlayerController.loadUrl() is only supported with '
+        'viewType: VideoViewType.platformView. '
+        'Current viewType is: $viewType. '
+        'This call will be ignored. '
+        'To use loadUrl(), create a controller with VideoPlayerOptions(viewType: VideoViewType.platformView).'
+      );
+      return;
+    }
+
+    // Stop the position update timer to prevent _updatePosition() from
+    // setting isCompleted=true when both position and duration are zero.
+    // The timer will be restarted by _applyPlayPause() after urlLoaded event.
+    _timer?.cancel();
+
+    _loadingUrlCompleter = Completer<void>();
+
+    value = value.copyWith(
+      duration: Duration.zero,
+      position: Duration.zero,
+      captionOffset: Duration.zero,
+      buffered: [],
+      isInitialized: false,
+      isPlaying: false,
+      isBuffering: false,
+      isCompleted: false,
+    );
+
+    await _videoPlayerPlatform.loadUrl(
+      _playerId,
+      url,
+      httpHeaders: httpHeaders,
+    );
+    await _loadingUrlCompleter!.future;
+    await play();
+  }
+
+  /// Returns whether Picture-in-Picture mode is currently active.
+  ///
+  /// This method is only supported on iOS when using [VideoViewType.platformView].
+  /// On unsupported platforms or view types, this returns `false`.
+  ///
+  /// Returns `true` if the video is currently playing in Picture-in-Picture mode,
+  /// `false` otherwise.
+  Future<bool> isPictureInPictureActive() async {
+    if (_isDisposedOrNotInitialized) {
+      return false;
+    }
+    return _videoPlayerPlatform.isPictureInPictureActive(_playerId);
   }
 
   /// Sets the caption offset.

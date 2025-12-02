@@ -22,4 +22,9 @@
   return [[AVPlayerLayer alloc] init];
 }
 
+- (BOOL)isPictureInPictureActive {
+  // PiP is not supported on macOS in this implementation.
+  return NO;
+}
+
 @end
