@@ -84,6 +84,12 @@ class FakeController extends ValueNotifier<VideoPlayerValue>
   Future<void> setClosedCaptionFile(
     Future<ClosedCaptionFile>? closedCaptionFile,
   ) async {}
+
+  @override
+  Future<bool> isPictureInPictureActive() async => false;
+
+  @override
+  Future<void> loadUrl(String url, {Map<String, String>? httpHeaders}) async {}
 }
 
 Future<ClosedCaptionFile> _loadClosedCaption() async =>
@@ -1667,5 +1673,16 @@ class FakeVideoPlayerPlatform extends VideoPlayerPlatform {
     }
     calls.add('setWebOptions');
     webOptions[playerId] = options;
+  }
+
+  @override
+  Future<void> loadUrl(int playerId, String url, {Map<String, String>? httpHeaders}) async {
+    calls.add('loadUrl');
+  }
+
+  @override
+  Future<bool> isPictureInPictureActive(int playerId) async {
+    calls.add('isPictureInPictureActive');
+    return false;
   }
 }

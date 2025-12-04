@@ -2,6 +2,7 @@
 
 * Updates minimum supported SDK version to Flutter 3.32/Dart 3.8.
 * Adds `isPictureInPictureActive` method to `VideoPlayerController` to check if Picture-in-Picture mode is active (iOS only with platform views).
+* Adds `loadUrl` method to `VideoPlayerController` to load a new video URL without disposing the controller (iOS/macOS only with platform views).
 
 ## 2.10.1
 

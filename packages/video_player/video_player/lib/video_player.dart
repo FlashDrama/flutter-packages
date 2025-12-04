@@ -416,12 +416,9 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   static const int kUninitializedPlayerId = -1;
   int _playerId = kUninitializedPlayerId;
 
-  /// The unique identifier for this video player.
-  ///
-  /// Returns [kUninitializedPlayerId] if the controller has not been initialized yet.
-  ///
-  /// This ID can be used to access platform-specific resources, such as
-  /// AVPlayerLayer on iOS/macOS when using platform views.
+  /// This is just exposed for testing. It shouldn't be used by anyone depending
+  /// on the plugin.
+  @visibleForTesting
   int get playerId => _playerId;
 
   /// Attempts to open the given [dataSource] and load metadata about the video.

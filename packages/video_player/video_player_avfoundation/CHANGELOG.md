@@ -1,6 +1,7 @@
 ## NEXT
 
 * Adds `isPictureInPictureActive` method to check if Picture-in-Picture mode is active (iOS only with platform views).
+* Adds `loadUrl` method to load a new video URL without disposing the player.
 
 ## 2.8.7
 
