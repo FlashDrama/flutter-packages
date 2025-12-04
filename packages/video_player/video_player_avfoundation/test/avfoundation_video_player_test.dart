@@ -633,6 +633,63 @@ void main() {
       });
     });
 
+    group('loadUrl', () {
+      test('calls native loadUrl', () async {
+        final (
+          AVFoundationVideoPlayer player,
+          MockAVFoundationVideoPlayerApi api,
+          MockVideoPlayerInstanceApi playerApi,
+        ) = setUpMockPlayer(playerId: 1);
+
+        const int newPlayerId = 2;
+        when(api.createForPlatformView(any)).thenAnswer((_) async => newPlayerId);
+        when(playerApi.loadUrl(any, any)).thenAnswer((_) async {});
+
+        await player.createWithOptions(
+          VideoCreationOptions(
+            dataSource: DataSource(
+              sourceType: DataSourceType.file,
+              uri: 'file:///foo/bar',
+            ),
+            viewType: VideoViewType.platformView,
+          ),
+        );
+
+        const String url = 'https://example.com/video.mp4';
+        await player.loadUrl(newPlayerId, url);
+        verify(playerApi.loadUrl(url, <String, String>{}));
+      });
+
+      test('passes http headers', () async {
+        final (
+          AVFoundationVideoPlayer player,
+          MockAVFoundationVideoPlayerApi api,
+          MockVideoPlayerInstanceApi playerApi,
+        ) = setUpMockPlayer(playerId: 1);
+
+        const int newPlayerId = 2;
+        when(api.createForPlatformView(any)).thenAnswer((_) async => newPlayerId);
+        when(playerApi.loadUrl(any, any)).thenAnswer((_) async {});
+
+        await player.createWithOptions(
+          VideoCreationOptions(
+            dataSource: DataSource(
+              sourceType: DataSourceType.file,
+              uri: 'file:///foo/bar',
+            ),
+            viewType: VideoViewType.platformView,
+          ),
+        );
+
+        const String url = 'https://example.com/video.mp4';
+        const Map<String, String> headers = <String, String>{
+          'Authorization': 'Bearer token'
+        };
+        await player.loadUrl(newPlayerId, url, httpHeaders: headers);
+        verify(playerApi.loadUrl(url, headers));
+      });
+    });
+
     test('videoEventsFor', () async {
       final (
         AVFoundationVideoPlayer player,
