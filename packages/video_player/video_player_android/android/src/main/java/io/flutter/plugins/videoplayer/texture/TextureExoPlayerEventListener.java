@@ -51,6 +51,25 @@ public final class TextureExoPlayerEventListener extends ExoPlayerEventListener 
     events.onInitialized(width, height, exoPlayer.getDuration(), rotationCorrection.getDegrees());
   }
 
+  @Override
+  protected void sendUrlLoaded() {
+    VideoSize videoSize = exoPlayer.getVideoSize();
+    RotationDegrees rotationCorrection = RotationDegrees.ROTATE_0;
+    int width = videoSize.width;
+    int height = videoSize.height;
+    if (width != 0 && height != 0) {
+      if (!surfaceProducerHandlesCropAndRotation) {
+        int rawVideoFormatRotation = getRotationCorrectionFromFormat(exoPlayer);
+        try {
+          rotationCorrection = RotationDegrees.fromDegrees(rawVideoFormatRotation);
+        } catch (IllegalArgumentException e) {
+          rotationCorrection = RotationDegrees.ROTATE_0;
+        }
+      }
+    }
+    events.onUrlLoaded(width, height, exoPlayer.getDuration(), rotationCorrection.getDegrees());
+  }
+
   @OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
   // A video's Format and its rotation degrees are unstable because they are not guaranteed
   // the same implementation across API versions. It is possible that this logic may need

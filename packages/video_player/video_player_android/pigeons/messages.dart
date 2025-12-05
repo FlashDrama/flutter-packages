@@ -37,6 +37,21 @@ class InitializationEvent extends PlatformVideoEvent {
   late final int rotationCorrection;
 }
 
+/// Sent when a new URL has been loaded via loadUrl().
+class UrlLoadedEvent extends PlatformVideoEvent {
+  /// The video duration in milliseconds.
+  late final int duration;
+
+  /// The width of the video in pixels.
+  late final int width;
+
+  /// The height of the video in pixels.
+  late final int height;
+
+  /// The rotation that should be applied during playback.
+  late final int rotationCorrection;
+}
+
 /// Sent when the video state changes.
 ///
 /// Corresponds to ExoPlayer's onPlaybackStateChanged.
@@ -111,6 +126,15 @@ abstract class VideoPlayerInstanceApi {
 
   /// Returns the current buffer position, in milliseconds.
   int getBufferedPosition();
+
+  /// Loads a new video URL without disposing the player.
+  void loadUrl(String url, Map<String, String> httpHeaders);
+
+  /// Returns whether Picture-in-Picture mode is currently active.
+  ///
+  /// Only works for platform view players on API 26+.
+  /// Returns false for texture view players or on unsupported API levels.
+  bool isPictureInPictureActive();
 }
 
 @EventChannelApi()

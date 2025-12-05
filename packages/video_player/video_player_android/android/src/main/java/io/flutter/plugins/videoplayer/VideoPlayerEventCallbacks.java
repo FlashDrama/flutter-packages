@@ -50,6 +50,13 @@ final class VideoPlayerEventCallbacks implements VideoPlayerCallbacks {
   }
 
   @Override
+  public void onUrlLoaded(
+      int width, int height, long durationInMs, int rotationCorrectionInDegrees) {
+    eventSink.success(
+        new UrlLoadedEvent(durationInMs, width, height, rotationCorrectionInDegrees));
+  }
+
+  @Override
   public void onPlaybackStateChanged(@NonNull PlatformPlaybackState state) {
     eventSink.success(new PlaybackStateChangeEvent(state));
   }

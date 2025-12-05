@@ -11,6 +11,7 @@ import androidx.media3.exoplayer.ExoPlayer;
 
 public abstract class ExoPlayerEventListener implements Player.Listener {
   private boolean isInitialized = false;
+  private boolean isUrlLoading = false;
   protected final ExoPlayer exoPlayer;
   protected final VideoPlayerCallbacks events;
 
@@ -48,6 +49,13 @@ public abstract class ExoPlayerEventListener implements Player.Listener {
 
   protected abstract void sendInitialized();
 
+  protected abstract void sendUrlLoaded();
+
+  /** Prepares the listener for a URL load operation. */
+  public void prepareForUrlLoad() {
+    isUrlLoading = true;
+  }
+
   @Override
   public void onPlaybackStateChanged(final int playbackState) {
     PlatformPlaybackState platformState = PlatformPlaybackState.UNKNOWN;
@@ -60,6 +68,9 @@ public abstract class ExoPlayerEventListener implements Player.Listener {
         if (!isInitialized) {
           isInitialized = true;
           sendInitialized();
+        } else if (isUrlLoading) {
+          isUrlLoading = false;
+          sendUrlLoaded();
         }
         break;
       case Player.STATE_ENDED:

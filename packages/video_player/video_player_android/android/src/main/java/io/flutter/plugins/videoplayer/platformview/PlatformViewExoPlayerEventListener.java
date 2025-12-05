@@ -5,6 +5,7 @@
 package io.flutter.plugins.videoplayer.platformview;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.annotation.OptIn;
 import androidx.media3.common.Format;
 import androidx.media3.common.util.UnstableApi;
@@ -14,9 +15,27 @@ import io.flutter.plugins.videoplayer.VideoPlayerCallbacks;
 import java.util.Objects;
 
 public final class PlatformViewExoPlayerEventListener extends ExoPlayerEventListener {
+  @Nullable private final Runnable onPlaybackStateChangedCallback;
+
   public PlatformViewExoPlayerEventListener(
       @NonNull ExoPlayer exoPlayer, @NonNull VideoPlayerCallbacks events) {
+    this(exoPlayer, events, null);
+  }
+
+  public PlatformViewExoPlayerEventListener(
+      @NonNull ExoPlayer exoPlayer,
+      @NonNull VideoPlayerCallbacks events,
+      @Nullable Runnable onPlaybackStateChangedCallback) {
     super(exoPlayer, events);
+    this.onPlaybackStateChangedCallback = onPlaybackStateChangedCallback;
+  }
+
+  @Override
+  public void onIsPlayingChanged(boolean isPlaying) {
+    super.onIsPlayingChanged(isPlaying);
+    if (onPlaybackStateChangedCallback != null) {
+      onPlaybackStateChangedCallback.run();
+    }
   }
 
   @OptIn(markerClass = UnstableApi.class)
@@ -41,5 +60,24 @@ public final class PlatformViewExoPlayerEventListener extends ExoPlayerEventList
     }
 
     events.onInitialized(width, height, exoPlayer.getDuration(), rotationCorrection.getDegrees());
+  }
+
+  @OptIn(markerClass = UnstableApi.class)
+  @Override
+  protected void sendUrlLoaded() {
+    Format videoFormat = exoPlayer.getVideoFormat();
+    RotationDegrees rotationCorrection =
+        RotationDegrees.fromDegrees(Objects.requireNonNull(videoFormat).rotationDegrees);
+    int width = videoFormat.width;
+    int height = videoFormat.height;
+
+    if (rotationCorrection == RotationDegrees.ROTATE_90
+        || rotationCorrection == RotationDegrees.ROTATE_270) {
+      width = videoFormat.height;
+      height = videoFormat.width;
+      rotationCorrection = RotationDegrees.fromDegrees(0);
+    }
+
+    events.onUrlLoaded(width, height, exoPlayer.getDuration(), rotationCorrection.getDegrees());
   }
 }

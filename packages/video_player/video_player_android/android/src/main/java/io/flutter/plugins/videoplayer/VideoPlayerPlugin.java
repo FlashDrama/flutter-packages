@@ -4,13 +4,21 @@
 
 package io.flutter.plugins.videoplayer;
 
+import android.app.Activity;
 import android.content.Context;
+import android.os.Build;
 import android.util.LongSparseArray;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.lifecycle.DefaultLifecycleObserver;
+import androidx.lifecycle.Lifecycle;
+import androidx.lifecycle.LifecycleOwner;
 import io.flutter.FlutterInjector;
 import io.flutter.Log;
 import io.flutter.embedding.engine.plugins.FlutterPlugin;
+import io.flutter.embedding.engine.plugins.activity.ActivityAware;
+import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding;
+import io.flutter.embedding.engine.plugins.lifecycle.FlutterLifecycleAdapter;
 import io.flutter.plugin.common.BinaryMessenger;
 import io.flutter.plugins.videoplayer.platformview.PlatformVideoViewFactory;
 import io.flutter.plugins.videoplayer.platformview.PlatformViewVideoPlayer;
@@ -18,12 +26,16 @@ import io.flutter.plugins.videoplayer.texture.TextureVideoPlayer;
 import io.flutter.view.TextureRegistry;
 
 /** Android platform implementation of the VideoPlayerPlugin. */
-public class VideoPlayerPlugin implements FlutterPlugin, AndroidVideoPlayerApi {
+public class VideoPlayerPlugin implements FlutterPlugin, ActivityAware, AndroidVideoPlayerApi {
   private static final String TAG = "VideoPlayerPlugin";
   private final LongSparseArray<VideoPlayer> videoPlayers = new LongSparseArray<>();
   private FlutterState flutterState;
   private final VideoPlayerOptions sharedOptions = new VideoPlayerOptions();
   private long nextPlayerIdentifier = 1;
+
+  @Nullable private Activity activity;
+  @Nullable private Lifecycle lifecycle;
+  @Nullable private PipLifecycleObserver pipObserver;
 
   /** Register this with the v2 embedding for the plugin to respond to lifecycle callbacks. */
   public VideoPlayerPlugin() {}
@@ -84,12 +96,17 @@ public class VideoPlayerPlugin implements FlutterPlugin, AndroidVideoPlayerApi {
 
     long id = nextPlayerIdentifier++;
     final String streamInstance = Long.toString(id);
-    VideoPlayer videoPlayer =
+    PlatformViewVideoPlayer videoPlayer =
         PlatformViewVideoPlayer.create(
             flutterState.applicationContext,
             VideoPlayerEventCallbacks.bindTo(flutterState.binaryMessenger, streamInstance),
             videoAsset,
             sharedOptions);
+
+    // Set activity for PiP support
+    if (activity != null) {
+      videoPlayer.setActivity(activity);
+    }
 
     registerPlayerInstance(videoPlayer, id);
     return id;
@@ -222,6 +239,79 @@ public class VideoPlayerPlugin implements FlutterPlugin, AndroidVideoPlayerApi {
 
     void stopListening(BinaryMessenger messenger) {
       AndroidVideoPlayerApi.Companion.setUp(messenger, null);
+    }
+  }
+
+  // ActivityAware implementation
+
+  @Override
+  public void onAttachedToActivity(@NonNull ActivityPluginBinding binding) {
+    activity = binding.getActivity();
+    lifecycle = FlutterLifecycleAdapter.getActivityLifecycle(binding);
+    pipObserver = new PipLifecycleObserver();
+    lifecycle.addObserver(pipObserver);
+
+    // Set activity on existing platform view players
+    updateActivityOnPlayers(activity);
+  }
+
+  @Override
+  public void onDetachedFromActivityForConfigChanges() {
+    onDetachedFromActivity();
+  }
+
+  @Override
+  public void onReattachedToActivityForConfigChanges(@NonNull ActivityPluginBinding binding) {
+    onAttachedToActivity(binding);
+  }
+
+  @Override
+  public void onDetachedFromActivity() {
+    if (lifecycle != null && pipObserver != null) {
+      lifecycle.removeObserver(pipObserver);
+    }
+    updateActivityOnPlayers(null);
+    activity = null;
+    lifecycle = null;
+    pipObserver = null;
+  }
+
+  private void updateActivityOnPlayers(@Nullable Activity newActivity) {
+    for (int i = 0; i < videoPlayers.size(); i++) {
+      VideoPlayer player = videoPlayers.valueAt(i);
+      if (player instanceof PlatformViewVideoPlayer) {
+        ((PlatformViewVideoPlayer) player).setActivity(newActivity);
+      }
+    }
+  }
+
+  /**
+   * Lifecycle observer for Picture-in-Picture functionality.
+   *
+   * <p>On API 26-30, enters PiP mode when the activity is paused (user navigates away). On API 31+,
+   * auto-enter PiP is handled by the system via setAutoEnterEnabled.
+   */
+  private class PipLifecycleObserver implements DefaultLifecycleObserver {
+    @Override
+    public void onPause(@NonNull LifecycleOwner owner) {
+      // On API 31+, auto-enter PiP is handled by setAutoEnterEnabled
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        return;
+      }
+
+      // On API 26-30, manually enter PiP when activity is paused
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        enterPipForPlayingPlayers();
+      }
+    }
+
+    private void enterPipForPlayingPlayers() {
+      for (int i = 0; i < videoPlayers.size(); i++) {
+        VideoPlayer player = videoPlayers.valueAt(i);
+        if (player instanceof PlatformViewVideoPlayer) {
+          ((PlatformViewVideoPlayer) player).enterPictureInPicture();
+        }
+      }
     }
   }
 }

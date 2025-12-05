@@ -19,6 +19,8 @@ import androidx.annotation.Nullable;
 public interface VideoPlayerCallbacks {
   void onInitialized(int width, int height, long durationInMs, int rotationCorrectionInDegrees);
 
+  void onUrlLoaded(int width, int height, long durationInMs, int rotationCorrectionInDegrees);
+
   void onPlaybackStateChanged(@NonNull PlatformPlaybackState state);
 
   void onError(@NonNull String code, @Nullable String message, @Nullable Object details);

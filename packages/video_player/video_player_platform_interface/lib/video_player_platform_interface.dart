@@ -156,10 +156,6 @@ abstract class VideoPlayerPlatform extends PlatformInterface {
 
   /// Loads a new video from the specified URL without disposing the player.
   ///
-  /// This method is currently only supported on iOS and macOS platforms
-  /// when using platform views (viewType: VideoViewType.platformView).
-  /// On unsupported platforms, this method will throw [UnimplementedError].
-  ///
   /// The player's current state (volume, playback speed, looping) is preserved.
   ///
   /// Throws a [PlatformException] if the URL is invalid or cannot be loaded.

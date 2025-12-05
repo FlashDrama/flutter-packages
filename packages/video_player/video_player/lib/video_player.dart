@@ -798,18 +798,6 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
       return;
     }
 
-    // platformView以外では警告を出して何もしない
-    if (viewType != VideoViewType.platformView) {
-      debugPrint(
-        'WARNING: VideoPlayerController.loadUrl() is only supported with '
-        'viewType: VideoViewType.platformView. '
-        'Current viewType is: $viewType. '
-        'This call will be ignored. '
-        'To use loadUrl(), create a controller with VideoPlayerOptions(viewType: VideoViewType.platformView).'
-      );
-      return;
-    }
-
     // Stop the position update timer to prevent _updatePosition() from
     // setting isCompleted=true when both position and duration are zero.
     // The timer will be restarted by _applyPlayPause() after urlLoaded event.
