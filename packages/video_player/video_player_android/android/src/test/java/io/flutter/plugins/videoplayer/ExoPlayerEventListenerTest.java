@@ -41,6 +41,7 @@ public final class ExoPlayerEventListenerTest {
    */
   private static final class TestExoPlayerEventListener extends ExoPlayerEventListener {
     private boolean calledSendInitialized = false;
+    private boolean calledSendUrlLoaded = false;
 
     public TestExoPlayerEventListener(ExoPlayer exoPlayer, VideoPlayerCallbacks callbacks) {
       super(exoPlayer, callbacks);
@@ -51,8 +52,17 @@ public final class ExoPlayerEventListenerTest {
       calledSendInitialized = true;
     }
 
+    @Override
+    protected void sendUrlLoaded() {
+      calledSendUrlLoaded = true;
+    }
+
     boolean calledSendInitialized() {
       return calledSendInitialized;
+    }
+
+    boolean calledSendUrlLoaded() {
+      return calledSendUrlLoaded;
     }
   }
 
@@ -111,5 +121,19 @@ public final class ExoPlayerEventListenerTest {
 
     eventListener.onIsPlayingChanged(false);
     verify(mockCallbacks).onIsPlayingStateUpdate(false);
+  }
+
+  @Test
+  public void onPlaybackStateChangedReadyAfterUrlLoadSendsUrlLoaded() {
+    // First ready state should trigger initialized
+    eventListener.onPlaybackStateChanged(Player.STATE_READY);
+    assertTrue(eventListener.calledSendInitialized());
+
+    // Prepare for URL loading
+    eventListener.prepareForUrlLoad();
+
+    // Second ready state should trigger urlLoaded
+    eventListener.onPlaybackStateChanged(Player.STATE_READY);
+    assertTrue(eventListener.calledSendUrlLoaded());
   }
 }

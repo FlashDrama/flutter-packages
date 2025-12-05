@@ -225,6 +225,13 @@ class AndroidVideoPlayer extends VideoPlayerPlatform {
     return _api.setMixWithOthers(mixWithOthers);
   }
 
+  @override
+  Future<void> loadUrl(int playerId, String url,
+      {Map<String, String>? httpHeaders}) {
+    return _playerWith(id: playerId)
+        .loadUrl(url, httpHeaders ?? <String, String>{});
+  }
+
   _PlayerInstance _playerWith({required int id}) {
     final _PlayerInstance? player = _players[id];
     return player ?? (throw StateError('No active player with ID $id.'));
@@ -303,6 +310,10 @@ class _PlayerInstance {
     return Duration(milliseconds: await _api.getCurrentPosition());
   }
 
+  Future<void> loadUrl(String url, Map<String, String> httpHeaders) {
+    return _api.loadUrl(url, httpHeaders);
+  }
+
   Stream<VideoEvent> videoEvents() {
     return _eventStreamController.stream;
   }
@@ -370,6 +381,15 @@ class _PlayerInstance {
             _updateBufferPosition(position);
           }
         });
+      case UrlLoadedEvent _:
+        _eventStreamController.add(
+          VideoEvent(
+            eventType: VideoEventType.urlLoaded,
+            duration: Duration(milliseconds: event.duration),
+            size: Size(event.width.toDouble(), event.height.toDouble()),
+            rotationCorrection: event.rotationCorrection,
+          ),
+        );
       case IsPlayingStateEvent _:
         _eventStreamController.add(
           VideoEvent(

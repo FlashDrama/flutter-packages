@@ -7,6 +7,7 @@ package io.flutter.plugins.videoplayer;
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.*;
 
+import android.content.Context;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.media3.common.AudioAttributes;
@@ -16,8 +17,12 @@ import androidx.media3.common.MediaItem;
 import androidx.media3.common.PlaybackParameters;
 import androidx.media3.common.Player;
 import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.exoplayer.source.MediaSource;
+import androidx.test.core.app.ApplicationProvider;
 import io.flutter.plugins.videoplayer.platformview.PlatformViewExoPlayerEventListener;
 import io.flutter.view.TextureRegistry.SurfaceProducer;
+import java.util.HashMap;
+import java.util.Map;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -56,12 +61,13 @@ public final class VideoPlayerTest {
   /** A test subclass of {@link VideoPlayer} that exposes the abstract class for testing. */
   private final class TestVideoPlayer extends VideoPlayer {
     private TestVideoPlayer(
+        @NonNull Context context,
         @NonNull VideoPlayerCallbacks events,
         @NonNull MediaItem mediaItem,
         @NonNull VideoPlayerOptions options,
         @Nullable SurfaceProducer surfaceProducer,
         @NonNull ExoPlayerProvider exoPlayerProvider) {
-      super(events, mediaItem, options, surfaceProducer, exoPlayerProvider);
+      super(context, events, mediaItem, options, surfaceProducer, exoPlayerProvider);
     }
 
     @NonNull
@@ -83,8 +89,9 @@ public final class VideoPlayerTest {
   }
 
   private VideoPlayer createVideoPlayer(VideoPlayerOptions options) {
+    Context context = ApplicationProvider.getApplicationContext();
     return new TestVideoPlayer(
-        mockEvents, fakeVideoAsset.getMediaItem(), options, null, () -> mockExoPlayer);
+        context, mockEvents, fakeVideoAsset.getMediaItem(), options, null, () -> mockExoPlayer);
   }
 
   @Test
@@ -226,5 +233,25 @@ public final class VideoPlayerTest {
     videoPlayer.dispose();
 
     verify(mockExoPlayer).release();
+  }
+
+  @Test
+  public void loadUrlSetsMediaSourceAndPrepares() {
+    VideoPlayer videoPlayer = createVideoPlayer();
+
+    // Reset mock to clear initial setMediaItem and prepare calls from constructor
+    reset(mockExoPlayer);
+
+    String newUrl = "https://flutter.dev/new-movie.mp4";
+    Map<String, String> httpHeaders = new HashMap<>();
+
+    // Call loadUrl
+    videoPlayer.loadUrl(newUrl, httpHeaders);
+
+    // Verify setMediaSource and prepare were called
+    verify(mockExoPlayer).setMediaSource(any(MediaSource.class));
+    verify(mockExoPlayer).prepare();
+
+    videoPlayer.dispose();
   }
 }

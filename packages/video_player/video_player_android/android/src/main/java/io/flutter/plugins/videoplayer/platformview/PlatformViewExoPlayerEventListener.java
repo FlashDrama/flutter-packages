@@ -42,4 +42,23 @@ public final class PlatformViewExoPlayerEventListener extends ExoPlayerEventList
 
     events.onInitialized(width, height, exoPlayer.getDuration(), rotationCorrection.getDegrees());
   }
+
+  @OptIn(markerClass = UnstableApi.class)
+  @Override
+  protected void sendUrlLoaded() {
+    Format videoFormat = exoPlayer.getVideoFormat();
+    RotationDegrees rotationCorrection =
+        RotationDegrees.fromDegrees(Objects.requireNonNull(videoFormat).rotationDegrees);
+    int width = videoFormat.width;
+    int height = videoFormat.height;
+
+    if (rotationCorrection == RotationDegrees.ROTATE_90
+        || rotationCorrection == RotationDegrees.ROTATE_270) {
+      width = videoFormat.height;
+      height = videoFormat.width;
+      rotationCorrection = RotationDegrees.fromDegrees(0);
+    }
+
+    events.onUrlLoaded(width, height, exoPlayer.getDuration(), rotationCorrection.getDegrees());
+  }
 }

@@ -7,6 +7,7 @@ package io.flutter.plugins.videoplayer;
 import static androidx.media3.common.Player.REPEAT_MODE_ALL;
 import static androidx.media3.common.Player.REPEAT_MODE_OFF;
 
+import android.content.Context;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.media3.common.AudioAttributes;
@@ -15,6 +16,7 @@ import androidx.media3.common.MediaItem;
 import androidx.media3.common.PlaybackParameters;
 import androidx.media3.exoplayer.ExoPlayer;
 import io.flutter.view.TextureRegistry.SurfaceProducer;
+import java.util.Map;
 
 /**
  * A class responsible for managing video playback using {@link ExoPlayer}.
@@ -22,10 +24,12 @@ import io.flutter.view.TextureRegistry.SurfaceProducer;
  * <p>It provides methods to control playback, adjust volume, and handle seeking.
  */
 public abstract class VideoPlayer implements VideoPlayerInstanceApi {
+  @NonNull private final Context context;
   @NonNull protected final VideoPlayerCallbacks videoPlayerEvents;
   @Nullable protected final SurfaceProducer surfaceProducer;
   @Nullable private DisposeHandler disposeHandler;
   @NonNull protected ExoPlayer exoPlayer;
+  @NonNull private final ExoPlayerEventListener eventListener;
 
   /** A closure-compatible signature since {@link java.util.function.Supplier} is API level 24. */
   public interface ExoPlayerProvider {
@@ -47,17 +51,20 @@ public abstract class VideoPlayer implements VideoPlayerInstanceApi {
   // Keeping behavior as-is and addressing the warning could cause a regression: https://github.com/flutter/packages/pull/10193
   @SuppressWarnings("this-escape")
   public VideoPlayer(
+      @NonNull Context context,
       @NonNull VideoPlayerCallbacks events,
       @NonNull MediaItem mediaItem,
       @NonNull VideoPlayerOptions options,
       @Nullable SurfaceProducer surfaceProducer,
       @NonNull ExoPlayerProvider exoPlayerProvider) {
+    this.context = context;
     this.videoPlayerEvents = events;
     this.surfaceProducer = surfaceProducer;
     exoPlayer = exoPlayerProvider.get();
     exoPlayer.setMediaItem(mediaItem);
     exoPlayer.prepare();
-    exoPlayer.addListener(createExoPlayerEventListener(exoPlayer, surfaceProducer));
+    eventListener = createExoPlayerEventListener(exoPlayer, surfaceProducer);
+    exoPlayer.addListener(eventListener);
     setAudioAttributes(exoPlayer, options.mixWithOthers);
   }
 
@@ -118,6 +125,21 @@ public abstract class VideoPlayer implements VideoPlayerInstanceApi {
   @Override
   public void seekTo(long position) {
     exoPlayer.seekTo(position);
+  }
+
+  @Override
+  public void loadUrl(@NonNull String url, @NonNull Map<String, String> httpHeaders) {
+    // Prepare event listener for URL loading
+    eventListener.prepareForUrlLoad();
+
+    // Create new VideoAsset from URL with HTTP headers
+    VideoAsset videoAsset =
+        VideoAsset.fromRemoteUrl(url, VideoAsset.StreamingFormat.UNKNOWN, httpHeaders, null);
+
+    // Set the new media source and prepare
+    exoPlayer.setMediaSource(
+        videoAsset.getMediaSourceFactory(context).createMediaSource(videoAsset.getMediaItem()));
+    exoPlayer.prepare();
   }
 
   @NonNull
