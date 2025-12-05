@@ -147,6 +147,19 @@ public abstract class VideoPlayer implements VideoPlayerInstanceApi {
     return exoPlayer;
   }
 
+  /**
+   * Returns whether Picture-in-Picture mode is currently active.
+   *
+   * <p>Default implementation returns false. Subclasses that support PiP should override this
+   * method.
+   *
+   * @return true if PiP is active, false otherwise.
+   */
+  @Override
+  public boolean isPictureInPictureActive() {
+    return false;
+  }
+
   public void dispose() {
     if (disposeHandler != null) {
       disposeHandler.onDispose();

@@ -129,6 +129,12 @@ abstract class VideoPlayerInstanceApi {
 
   /// Loads a new video URL without disposing the player.
   void loadUrl(String url, Map<String, String> httpHeaders);
+
+  /// Returns whether Picture-in-Picture mode is currently active.
+  ///
+  /// Only works for platform view players on API 26+.
+  /// Returns false for texture view players or on unsupported API levels.
+  bool isPictureInPictureActive();
 }
 
 @EventChannelApi()

@@ -615,6 +615,13 @@ interface VideoPlayerInstanceApi {
   fun getBufferedPosition(): Long
   /** Loads a new video URL without disposing the player. */
   fun loadUrl(url: String, httpHeaders: Map<String, String>)
+  /**
+   * Returns whether Picture-in-Picture mode is currently active.
+   *
+   * Only works for platform view players on API 26+.
+   * Returns false for texture view players or on unsupported API levels.
+   */
+  fun isPictureInPictureActive(): Boolean
 
   companion object {
     /** The codec used by VideoPlayerInstanceApi. */
@@ -769,6 +776,21 @@ interface VideoPlayerInstanceApi {
             val wrapped: List<Any?> = try {
               api.loadUrl(urlArg, httpHeadersArg)
               listOf(null)
+            } catch (exception: Throwable) {
+              MessagesPigeonUtils.wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.video_player_android.VideoPlayerInstanceApi.isPictureInPictureActive$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            val wrapped: List<Any?> = try {
+              listOf(api.isPictureInPictureActive())
             } catch (exception: Throwable) {
               MessagesPigeonUtils.wrapError(exception)
             }

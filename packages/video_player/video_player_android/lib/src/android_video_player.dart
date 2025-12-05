@@ -232,6 +232,16 @@ class AndroidVideoPlayer extends VideoPlayerPlatform {
         .loadUrl(url, httpHeaders ?? <String, String>{});
   }
 
+  @override
+  Future<bool> isPictureInPictureActive(int playerId) {
+    final _PlayerInstance player = _playerWith(id: playerId);
+    // PiP is only supported for platform view players
+    if (player.viewState is! VideoPlayerPlatformViewState) {
+      return Future<bool>.value(false);
+    }
+    return player.isPictureInPictureActive();
+  }
+
   _PlayerInstance _playerWith({required int id}) {
     final _PlayerInstance? player = _players[id];
     return player ?? (throw StateError('No active player with ID $id.'));
@@ -312,6 +322,10 @@ class _PlayerInstance {
 
   Future<void> loadUrl(String url, Map<String, String> httpHeaders) {
     return _api.loadUrl(url, httpHeaders);
+  }
+
+  Future<bool> isPictureInPictureActive() {
+    return _api.isPictureInPictureActive();
   }
 
   Stream<VideoEvent> videoEvents() {

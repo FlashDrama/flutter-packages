@@ -254,4 +254,14 @@ public final class VideoPlayerTest {
 
     videoPlayer.dispose();
   }
+
+  @Test
+  public void isPictureInPictureActiveReturnsFalseByDefault() {
+    VideoPlayer videoPlayer = createVideoPlayer();
+
+    // Base implementation always returns false
+    assertEquals(false, videoPlayer.isPictureInPictureActive());
+
+    videoPlayer.dispose();
+  }
 }
