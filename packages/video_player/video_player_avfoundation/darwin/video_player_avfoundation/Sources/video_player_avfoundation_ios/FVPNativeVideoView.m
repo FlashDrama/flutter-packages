@@ -6,6 +6,7 @@
 
 #import <AVFoundation/AVFoundation.h>
 #import <AVKit/AVKit.h>
+#import <UIKit/UIKit.h>
 
 @interface FVPPlayerView : UIView
 @end
@@ -37,10 +38,35 @@
         AVPlayerLayer *playerLayer = (AVPlayerLayer *)[_playerView layer];
         _pipController = [[AVPictureInPictureController alloc] initWithPlayerLayer:playerLayer];
         _pipController.canStartPictureInPictureAutomaticallyFromInline = YES;
+
+        [[NSNotificationCenter defaultCenter]
+            addObserver:self
+               selector:@selector(applicationDidBecomeActive:)
+                   name:UIApplicationDidBecomeActiveNotification
+                 object:nil];
       }
     }
   }
   return self;
+}
+
+- (void)dealloc {
+  [[NSNotificationCenter defaultCenter] removeObserver:self
+                                                  name:UIApplicationDidBecomeActiveNotification
+                                                object:nil];
+}
+
+// Stop any active PiP whenever the app foregrounds so that returning to the
+// app via any path (icon, app switcher, deeplink, …) tears down PiP through
+// the standard delegate sequence (`willStop` → `didStop`) instead of leaving
+// the floating window on top of the app. The PiP restore button path is
+// observed to start its stop before this notification fires, so the
+// `pictureInPictureActive` guard skips this branch and avoids a double-stop;
+// if that ordering ever changes the guard still prevents redundant teardown.
+- (void)applicationDidBecomeActive:(NSNotification *)notification {
+  if (self.pipController.pictureInPictureActive) {
+    [self.pipController stopPictureInPicture];
+  }
 }
 
 - (FVPPlayerView *)view {
