@@ -2,6 +2,7 @@
 
 * Adds `isPictureInPictureActive` method to check if Picture-in-Picture mode is active (iOS only with platform views).
 * Adds `loadUrl` method to load a new video URL without disposing the player.
+* Stops Picture-in-Picture automatically when the app foregrounds, so returning via the icon, app switcher, or deep link tears down PiP through the standard `willStop` → `didStop` delegate sequence instead of leaving the floating window on top of the main UI (iOS only).
 
 ## 2.8.7
 
