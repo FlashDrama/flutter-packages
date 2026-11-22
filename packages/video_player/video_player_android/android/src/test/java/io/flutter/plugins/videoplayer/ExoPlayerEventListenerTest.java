@@ -4,14 +4,21 @@
 
 package io.flutter.plugins.videoplayer;
 
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 
+import android.os.Looper;
+import androidx.media3.common.C;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
+import androidx.media3.common.Timeline;
 import androidx.media3.exoplayer.ExoPlayer;
+import java.time.Duration;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -20,6 +27,7 @@ import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 import org.robolectric.RobolectricTestRunner;
+import org.robolectric.Shadows;
 
 /**
  * Unit tests for {@link ExoPlayerEventListener}.
@@ -41,7 +49,6 @@ public final class ExoPlayerEventListenerTest {
    */
   private static final class TestExoPlayerEventListener extends ExoPlayerEventListener {
     private boolean calledSendInitialized = false;
-    private boolean calledSendUrlLoaded = false;
 
     public TestExoPlayerEventListener(ExoPlayer exoPlayer, VideoPlayerCallbacks callbacks) {
       super(exoPlayer, callbacks);
@@ -52,17 +59,8 @@ public final class ExoPlayerEventListenerTest {
       calledSendInitialized = true;
     }
 
-    @Override
-    protected void sendUrlLoaded() {
-      calledSendUrlLoaded = true;
-    }
-
     boolean calledSendInitialized() {
       return calledSendInitialized;
-    }
-
-    boolean calledSendUrlLoaded() {
-      return calledSendUrlLoaded;
     }
   }
 
@@ -97,10 +95,68 @@ public final class ExoPlayerEventListenerTest {
 
   @Test
   public void onPlaybackStateChangedReadySendsInitializedAndReady() {
+    when(mockExoPlayer.getDuration()).thenReturn(10L);
+
     eventListener.onPlaybackStateChanged(Player.STATE_READY);
 
     verify(mockCallbacks).onPlaybackStateChanged(PlatformPlaybackState.READY);
     verifyNoMoreInteractions(mockCallbacks);
+    assertTrue(eventListener.calledSendInitialized());
+  }
+
+  @Test
+  public void onPlaybackStateChangedReadyDelaysInitializationWhenDurationUnsetForNonLiveMedia() {
+    when(mockExoPlayer.getDuration()).thenReturn(C.TIME_UNSET);
+    when(mockExoPlayer.isCurrentMediaItemLive()).thenReturn(false);
+    when(mockExoPlayer.isCurrentMediaItemDynamic()).thenReturn(false);
+
+    eventListener.onPlaybackStateChanged(Player.STATE_READY);
+
+    verify(mockCallbacks).onPlaybackStateChanged(PlatformPlaybackState.READY);
+    verifyNoMoreInteractions(mockCallbacks);
+    assertFalse(eventListener.calledSendInitialized());
+  }
+
+  @Test
+  public void onPlaybackStateChangedReadySendsInitializedImmediatelyWhenDurationAvailable() {
+    when(mockExoPlayer.getDuration()).thenReturn(10L);
+
+    eventListener.onPlaybackStateChanged(Player.STATE_READY);
+
+    assertTrue(eventListener.calledSendInitialized());
+  }
+
+  @Test
+  public void onPlaybackStateChangedReadyFallsBackWhenDurationRemainsUnset() {
+    when(mockExoPlayer.getDuration()).thenReturn(C.TIME_UNSET);
+    when(mockExoPlayer.isCurrentMediaItemLive()).thenReturn(false);
+    when(mockExoPlayer.isCurrentMediaItemDynamic()).thenReturn(false);
+
+    eventListener.onPlaybackStateChanged(Player.STATE_READY);
+    assertFalse(eventListener.calledSendInitialized());
+
+    Shadows.shadowOf(Looper.getMainLooper())
+        .idleFor(
+            Duration.ofMillis(ExoPlayerEventListener.DURATION_UNSET_INITIALIZATION_TIMEOUT_MS));
+
+    assertTrue(eventListener.calledSendInitialized());
+  }
+
+  @Test
+  public void onTimelineChangedSendsInitializedWhenDurationBecomesAvailable() {
+    when(mockExoPlayer.getDuration()).thenReturn(C.TIME_UNSET);
+    when(mockExoPlayer.isCurrentMediaItemLive()).thenReturn(false);
+    when(mockExoPlayer.isCurrentMediaItemDynamic()).thenReturn(false);
+
+    eventListener.onPlaybackStateChanged(Player.STATE_READY);
+    assertFalse(eventListener.calledSendInitialized());
+
+    when(mockExoPlayer.getPlaybackState()).thenReturn(Player.STATE_READY);
+    when(mockExoPlayer.getDuration()).thenReturn(10L);
+
+    eventListener.onTimelineChanged(
+        mock(Timeline.class), Player.TIMELINE_CHANGE_REASON_SOURCE_UPDATE);
+
     assertTrue(eventListener.calledSendInitialized());
   }
 
@@ -121,19 +177,5 @@ public final class ExoPlayerEventListenerTest {
 
     eventListener.onIsPlayingChanged(false);
     verify(mockCallbacks).onIsPlayingStateUpdate(false);
-  }
-
-  @Test
-  public void onPlaybackStateChangedReadyAfterUrlLoadSendsUrlLoaded() {
-    // First ready state should trigger initialized
-    eventListener.onPlaybackStateChanged(Player.STATE_READY);
-    assertTrue(eventListener.calledSendInitialized());
-
-    // Prepare for URL loading
-    eventListener.prepareForUrlLoad();
-
-    // Second ready state should trigger urlLoaded
-    eventListener.onPlaybackStateChanged(Player.STATE_READY);
-    assertTrue(eventListener.calledSendUrlLoaded());
   }
 }

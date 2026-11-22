@@ -6,10 +6,12 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math show max;
 
+import 'package:collection/collection.dart' as collection;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:video_player_platform_interface/video_player_platform_interface.dart';
+import 'package:video_player_platform_interface/video_player_platform_interface.dart'
+    as platform_interface;
 
 import 'src/closed_caption_file.dart';
 
@@ -25,10 +27,111 @@ export 'package:video_player_platform_interface/video_player_platform_interface.
 
 export 'src/closed_caption_file.dart';
 
-VideoPlayerPlatform? _lastVideoPlayerPlatform;
+/// Represents an audio track in a video with its metadata.
+@immutable
+class VideoAudioTrack {
+  /// Constructs an instance of [VideoAudioTrack].
+  const VideoAudioTrack({
+    required this.id,
+    required this.isSelected,
+    this.label,
+    this.language,
+    this.bitrate,
+    this.sampleRate,
+    this.channelCount,
+    this.codec,
+  });
 
-VideoPlayerPlatform get _videoPlayerPlatform {
-  final VideoPlayerPlatform currentInstance = VideoPlayerPlatform.instance;
+  /// Unique identifier for the audio track.
+  final String id;
+
+  /// Human-readable label for the track.
+  ///
+  /// May be null if not available from the platform.
+  final String? label;
+
+  /// Language code of the audio track (e.g., 'en', 'es', 'und').
+  ///
+  /// May be null if not available from the platform.
+  final String? language;
+
+  /// Whether this track is currently selected.
+  final bool isSelected;
+
+  /// Bitrate of the audio track in bits per second.
+  ///
+  /// May be null if not available from the platform.
+  final int? bitrate;
+
+  /// Sample rate of the audio track in Hz.
+  ///
+  /// May be null if not available from the platform.
+  final int? sampleRate;
+
+  /// Number of audio channels.
+  ///
+  /// May be null if not available from the platform.
+  final int? channelCount;
+
+  /// Audio codec used (e.g., 'aac', 'mp3', 'ac3').
+  ///
+  /// May be null if not available from the platform.
+  final String? codec;
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is VideoAudioTrack &&
+            runtimeType == other.runtimeType &&
+            id == other.id &&
+            label == other.label &&
+            language == other.language &&
+            isSelected == other.isSelected &&
+            bitrate == other.bitrate &&
+            sampleRate == other.sampleRate &&
+            channelCount == other.channelCount &&
+            codec == other.codec;
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, label, language, isSelected, bitrate, sampleRate, channelCount, codec);
+
+  @override
+  String toString() =>
+      'VideoAudioTrack('
+      'id: $id, '
+      'label: $label, '
+      'language: $language, '
+      'isSelected: $isSelected, '
+      'bitrate: $bitrate, '
+      'sampleRate: $sampleRate, '
+      'channelCount: $channelCount, '
+      'codec: $codec)';
+}
+
+/// Converts a platform interface [VideoAudioTrack] to the public API type.
+///
+/// This internal method is used to decouple the public API from the
+/// platform interface implementation.
+VideoAudioTrack _convertPlatformAudioTrack(platform_interface.VideoAudioTrack platformTrack) {
+  return VideoAudioTrack(
+    id: platformTrack.id,
+    label: platformTrack.label,
+    language: platformTrack.language,
+    isSelected: platformTrack.isSelected,
+    bitrate: platformTrack.bitrate,
+    sampleRate: platformTrack.sampleRate,
+    channelCount: platformTrack.channelCount,
+    codec: platformTrack.codec,
+  );
+}
+
+platform_interface.VideoPlayerPlatform? _lastVideoPlayerPlatform;
+
+platform_interface.VideoPlayerPlatform get _videoPlayerPlatform {
+  final platform_interface.VideoPlayerPlatform currentInstance =
+      platform_interface.VideoPlayerPlatform.instance;
   if (_lastVideoPlayerPlatform != currentInstance) {
     // This will clear all open videos on the platform when a full restart is
     // performed.
@@ -50,7 +153,7 @@ class VideoPlayerValue {
     this.position = Duration.zero,
     this.caption = Caption.none,
     this.captionOffset = Duration.zero,
-    this.buffered = const <DurationRange>[],
+    this.buffered = const <platform_interface.DurationRange>[],
     this.isInitialized = false,
     this.isPlaying = false,
     this.isLooping = false,
@@ -60,19 +163,15 @@ class VideoPlayerValue {
     this.rotationCorrection = 0,
     this.errorDescription,
     this.isCompleted = false,
+    this.preventsDisplaySleepDuringVideoPlayback = true,
   });
 
   /// Returns an instance for a video that hasn't been loaded.
-  const VideoPlayerValue.uninitialized()
-    : this(duration: Duration.zero, isInitialized: false);
+  const VideoPlayerValue.uninitialized() : this(duration: Duration.zero, isInitialized: false);
 
   /// Returns an instance with the given [errorDescription].
   const VideoPlayerValue.erroneous(String errorDescription)
-    : this(
-        duration: Duration.zero,
-        isInitialized: false,
-        errorDescription: errorDescription,
-      );
+    : this(duration: Duration.zero, isInitialized: false, errorDescription: errorDescription);
 
   /// This constant is just to indicate that parameter is not passed to [copyWith]
   /// workaround for this issue https://github.com/dart-lang/language/issues/2009
@@ -98,7 +197,7 @@ class VideoPlayerValue {
   final Duration captionOffset;
 
   /// The currently buffered ranges.
-  final List<DurationRange> buffered;
+  final List<platform_interface.DurationRange> buffered;
 
   /// True if the video is playing. False if it's paused.
   final bool isPlaying;
@@ -125,6 +224,13 @@ class VideoPlayerValue {
   /// Reverts to false if video position changes, or video begins playing.
   /// Does not update if video is looping.
   final bool isCompleted;
+
+  /// Whether the screen is prevented from sleeping during video playback.
+  ///
+  /// Defaults to `true`.
+  ///
+  /// This is currently only supported on iOS and macOS.
+  final bool preventsDisplaySleepDuringVideoPlayback;
 
   /// The [size] of the currently loaded video.
   final Size size;
@@ -164,7 +270,7 @@ class VideoPlayerValue {
     Duration? position,
     Caption? caption,
     Duration? captionOffset,
-    List<DurationRange>? buffered,
+    List<platform_interface.DurationRange>? buffered,
     bool? isInitialized,
     bool? isPlaying,
     bool? isLooping,
@@ -174,6 +280,7 @@ class VideoPlayerValue {
     int? rotationCorrection,
     String? errorDescription = _defaultErrorDescription,
     bool? isCompleted,
+    bool? preventsDisplaySleepDuringVideoPlayback,
   }) {
     return VideoPlayerValue(
       duration: duration ?? this.duration,
@@ -193,6 +300,8 @@ class VideoPlayerValue {
           ? errorDescription
           : this.errorDescription,
       isCompleted: isCompleted ?? this.isCompleted,
+      preventsDisplaySleepDuringVideoPlayback:
+          preventsDisplaySleepDuringVideoPlayback ?? this.preventsDisplaySleepDuringVideoPlayback,
     );
   }
 
@@ -212,7 +321,8 @@ class VideoPlayerValue {
         'volume: $volume, '
         'playbackSpeed: $playbackSpeed, '
         'errorDescription: $errorDescription, '
-        'isCompleted: $isCompleted),';
+        'isCompleted: $isCompleted, '
+        'preventsDisplaySleepDuringVideoPlayback: $preventsDisplaySleepDuringVideoPlayback),';
   }
 
   @override
@@ -234,7 +344,8 @@ class VideoPlayerValue {
           size == other.size &&
           rotationCorrection == other.rotationCorrection &&
           isInitialized == other.isInitialized &&
-          isCompleted == other.isCompleted;
+          isCompleted == other.isCompleted &&
+          preventsDisplaySleepDuringVideoPlayback == other.preventsDisplaySleepDuringVideoPlayback;
 
   @override
   int get hashCode => Object.hash(
@@ -253,6 +364,7 @@ class VideoPlayerValue {
     rotationCorrection,
     isInitialized,
     isCompleted,
+    preventsDisplaySleepDuringVideoPlayback,
   );
 }
 
@@ -281,12 +393,18 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     this.package,
     Future<ClosedCaptionFile>? closedCaptionFile,
     this.videoPlayerOptions,
-    this.viewType = VideoViewType.textureView,
+    this.viewType = platform_interface.VideoViewType.textureView,
   }) : _closedCaptionFileFuture = closedCaptionFile,
-       dataSourceType = DataSourceType.asset,
+       dataSourceType = platform_interface.DataSourceType.asset,
        formatHint = null,
        httpHeaders = const <String, String>{},
-       super(const VideoPlayerValue(duration: Duration.zero));
+       super(
+         VideoPlayerValue(
+           duration: Duration.zero,
+           preventsDisplaySleepDuringVideoPlayback:
+               videoPlayerOptions?.preventsDisplaySleepDuringVideoPlayback ?? true,
+         ),
+       );
 
   /// Constructs a [VideoPlayerController] playing a network video.
   ///
@@ -308,11 +426,17 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     Future<ClosedCaptionFile>? closedCaptionFile,
     this.videoPlayerOptions,
     this.httpHeaders = const <String, String>{},
-    this.viewType = VideoViewType.textureView,
+    this.viewType = platform_interface.VideoViewType.textureView,
   }) : _closedCaptionFileFuture = closedCaptionFile,
-       dataSourceType = DataSourceType.network,
+       dataSourceType = platform_interface.DataSourceType.network,
        package = null,
-       super(const VideoPlayerValue(duration: Duration.zero));
+       super(
+         VideoPlayerValue(
+           duration: Duration.zero,
+           preventsDisplaySleepDuringVideoPlayback:
+               videoPlayerOptions?.preventsDisplaySleepDuringVideoPlayback ?? true,
+         ),
+       );
 
   /// Constructs a [VideoPlayerController] playing a network video.
   ///
@@ -329,12 +453,18 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     Future<ClosedCaptionFile>? closedCaptionFile,
     this.videoPlayerOptions,
     this.httpHeaders = const <String, String>{},
-    this.viewType = VideoViewType.textureView,
+    this.viewType = platform_interface.VideoViewType.textureView,
   }) : _closedCaptionFileFuture = closedCaptionFile,
        dataSource = url.toString(),
-       dataSourceType = DataSourceType.network,
+       dataSourceType = platform_interface.DataSourceType.network,
        package = null,
-       super(const VideoPlayerValue(duration: Duration.zero));
+       super(
+         VideoPlayerValue(
+           duration: Duration.zero,
+           preventsDisplaySleepDuringVideoPlayback:
+               videoPlayerOptions?.preventsDisplaySleepDuringVideoPlayback ?? true,
+         ),
+       );
 
   /// Constructs a [VideoPlayerController] playing a video from a file.
   ///
@@ -345,13 +475,19 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     Future<ClosedCaptionFile>? closedCaptionFile,
     this.videoPlayerOptions,
     this.httpHeaders = const <String, String>{},
-    this.viewType = VideoViewType.textureView,
+    this.viewType = platform_interface.VideoViewType.textureView,
   }) : _closedCaptionFileFuture = closedCaptionFile,
        dataSource = Uri.file(file.absolute.path).toString(),
-       dataSourceType = DataSourceType.file,
+       dataSourceType = platform_interface.DataSourceType.file,
        package = null,
        formatHint = null,
-       super(const VideoPlayerValue(duration: Duration.zero));
+       super(
+         VideoPlayerValue(
+           duration: Duration.zero,
+           preventsDisplaySleepDuringVideoPlayback:
+               videoPlayerOptions?.preventsDisplaySleepDuringVideoPlayback ?? true,
+         ),
+       );
 
   /// Constructs a [VideoPlayerController] playing a video from a contentUri.
   ///
@@ -361,18 +497,24 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     Uri contentUri, {
     Future<ClosedCaptionFile>? closedCaptionFile,
     this.videoPlayerOptions,
-    this.viewType = VideoViewType.textureView,
+    this.viewType = platform_interface.VideoViewType.textureView,
   }) : assert(
          defaultTargetPlatform == TargetPlatform.android,
          'VideoPlayerController.contentUri is only supported on Android.',
        ),
        _closedCaptionFileFuture = closedCaptionFile,
        dataSource = contentUri.toString(),
-       dataSourceType = DataSourceType.contentUri,
+       dataSourceType = platform_interface.DataSourceType.contentUri,
        package = null,
        formatHint = null,
        httpHeaders = const <String, String>{},
-       super(const VideoPlayerValue(duration: Duration.zero));
+       super(
+         VideoPlayerValue(
+           duration: Duration.zero,
+           preventsDisplaySleepDuringVideoPlayback:
+               videoPlayerOptions?.preventsDisplaySleepDuringVideoPlayback ?? true,
+         ),
+       );
 
   /// The URI to the video file. This will be in different formats depending on
   /// the [DataSourceType] of the original video.
@@ -385,14 +527,14 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
 
   /// **Android only**. Will override the platform's generic file format
   /// detection with whatever is set here.
-  final VideoFormat? formatHint;
+  final platform_interface.VideoFormat? formatHint;
 
   /// Describes the type of data source this [VideoPlayerController]
   /// is constructed with.
-  final DataSourceType dataSourceType;
+  final platform_interface.DataSourceType dataSourceType;
 
   /// Provide additional configuration options (optional). Like setting the audio mode to mix
-  final VideoPlayerOptions? videoPlayerOptions;
+  final platform_interface.VideoPlayerOptions? videoPlayerOptions;
 
   /// Only set for [asset] videos. The package that the asset was loaded from.
   final String? package;
@@ -400,14 +542,15 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   /// The requested display mode for the video.
   ///
   /// Platforms that do not support the request view type will ignore this.
-  final VideoViewType viewType;
+  final platform_interface.VideoViewType viewType;
 
   Future<ClosedCaptionFile>? _closedCaptionFileFuture;
   ClosedCaptionFile? _closedCaptionFile;
+  List<Caption>? _sortedCaptions;
+
   Timer? _timer;
   bool _isDisposed = false;
   Completer<void>? _creatingCompleter;
-  Completer<void>? _loadingUrlCompleter;
   StreamSubscription<dynamic>? _eventSubscription;
   _VideoAppLifeCycleObserver? _lifeCycleObserver;
 
@@ -423,74 +566,73 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
 
   /// Attempts to open the given [dataSource] and load metadata about the video.
   Future<void> initialize() async {
-    final bool allowBackgroundPlayback =
-        videoPlayerOptions?.allowBackgroundPlayback ?? false;
+    final bool allowBackgroundPlayback = videoPlayerOptions?.allowBackgroundPlayback ?? false;
     if (!allowBackgroundPlayback) {
       _lifeCycleObserver = _VideoAppLifeCycleObserver(this);
     }
     _lifeCycleObserver?.initialize();
     _creatingCompleter = Completer<void>();
 
-    final DataSource dataSourceDescription;
+    final platform_interface.DataSource dataSourceDescription;
     switch (dataSourceType) {
-      case DataSourceType.asset:
-        dataSourceDescription = DataSource(
-          sourceType: DataSourceType.asset,
+      case platform_interface.DataSourceType.asset:
+        dataSourceDescription = platform_interface.DataSource(
+          sourceType: platform_interface.DataSourceType.asset,
           asset: dataSource,
           package: package,
         );
-      case DataSourceType.network:
-        dataSourceDescription = DataSource(
-          sourceType: DataSourceType.network,
+      case platform_interface.DataSourceType.network:
+        dataSourceDescription = platform_interface.DataSource(
+          sourceType: platform_interface.DataSourceType.network,
           uri: dataSource,
           formatHint: formatHint,
           httpHeaders: httpHeaders,
         );
-      case DataSourceType.file:
-        dataSourceDescription = DataSource(
-          sourceType: DataSourceType.file,
+      case platform_interface.DataSourceType.file:
+        dataSourceDescription = platform_interface.DataSource(
+          sourceType: platform_interface.DataSourceType.file,
           uri: dataSource,
           httpHeaders: httpHeaders,
         );
-      case DataSourceType.contentUri:
-        dataSourceDescription = DataSource(
-          sourceType: DataSourceType.contentUri,
+      case platform_interface.DataSourceType.contentUri:
+        dataSourceDescription = platform_interface.DataSource(
+          sourceType: platform_interface.DataSourceType.contentUri,
           uri: dataSource,
         );
     }
 
-    final VideoCreationOptions creationOptions = VideoCreationOptions(
+    final creationOptions = platform_interface.VideoCreationOptions(
       dataSource: dataSourceDescription,
       viewType: viewType,
+      videoPlayerOptions: videoPlayerOptions,
     );
 
     if (videoPlayerOptions?.mixWithOthers != null) {
-      await _videoPlayerPlatform.setMixWithOthers(
-        videoPlayerOptions!.mixWithOthers,
-      );
+      await _videoPlayerPlatform.setMixWithOthers(videoPlayerOptions!.mixWithOthers);
     }
 
     _playerId =
-        (await _videoPlayerPlatform.createWithOptions(creationOptions)) ??
-        kUninitializedPlayerId;
+        (await _videoPlayerPlatform.createWithOptions(creationOptions)) ?? kUninitializedPlayerId;
     _creatingCompleter!.complete(null);
-    final Completer<void> initializingCompleter = Completer<void>();
+    final initializingCompleter = Completer<void>();
+
+    await _videoPlayerPlatform.setPreventsDisplaySleepDuringVideoPlayback(
+      _playerId,
+      value.preventsDisplaySleepDuringVideoPlayback,
+    );
 
     // Apply the web-specific options
     if (kIsWeb && videoPlayerOptions?.webOptions != null) {
-      await _videoPlayerPlatform.setWebOptions(
-        _playerId,
-        videoPlayerOptions!.webOptions!,
-      );
+      await _videoPlayerPlatform.setWebOptions(_playerId, videoPlayerOptions!.webOptions!);
     }
 
-    void eventListener(VideoEvent event) {
+    void eventListener(platform_interface.VideoEvent event) {
       if (_isDisposed) {
         return;
       }
 
       switch (event.eventType) {
-        case VideoEventType.initialized:
+        case platform_interface.VideoEventType.initialized:
           value = value.copyWith(
             duration: event.duration,
             size: event.size,
@@ -513,45 +655,26 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
           _applyLooping();
           _applyVolume();
           _applyPlayPause();
-        case VideoEventType.urlLoaded:
-          value = value.copyWith(
-            duration: event.duration,
-            size: event.size,
-            rotationCorrection: event.rotationCorrection,
-            isInitialized: event.duration != null,
-            errorDescription: null,
-            isCompleted: false,
-          );
-          if (_loadingUrlCompleter != null && !_loadingUrlCompleter!.isCompleted) {
-            _loadingUrlCompleter!.complete(null);
-            _loadingUrlCompleter = null;
-          }
-          _applyLooping();
-          _applyVolume();
-          _applyPlayPause();
-        case VideoEventType.completed:
+        case platform_interface.VideoEventType.completed:
           // In this case we need to stop _timer, set isPlaying=false, and
           // position=value.duration. Instead of setting the values directly,
           // we use pause() and seekTo() to ensure the platform stops playing
           // and seeks to the last frame of the video.
           pause().then((void pauseResult) => seekTo(value.duration));
           value = value.copyWith(isCompleted: true);
-        case VideoEventType.bufferingUpdate:
+        case platform_interface.VideoEventType.bufferingUpdate:
           value = value.copyWith(buffered: event.buffered);
-        case VideoEventType.bufferingStart:
+        case platform_interface.VideoEventType.bufferingStart:
           value = value.copyWith(isBuffering: true);
-        case VideoEventType.bufferingEnd:
+        case platform_interface.VideoEventType.bufferingEnd:
           value = value.copyWith(isBuffering: false);
-        case VideoEventType.isPlayingStateUpdate:
+        case platform_interface.VideoEventType.isPlayingStateUpdate:
           if (event.isPlaying ?? false) {
-            value = value.copyWith(
-              isPlaying: event.isPlaying,
-              isCompleted: false,
-            );
+            value = value.copyWith(isPlaying: event.isPlaying, isCompleted: false);
           } else {
             value = value.copyWith(isPlaying: event.isPlaying);
           }
-        case VideoEventType.unknown:
+        case platform_interface.VideoEventType.unknown:
           break;
       }
     }
@@ -561,15 +684,11 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     }
 
     void errorListener(Object obj) {
-      final PlatformException e = obj as PlatformException;
+      final e = obj as PlatformException;
       value = VideoPlayerValue.erroneous(e.message!);
       _timer?.cancel();
       if (!initializingCompleter.isCompleted) {
         initializingCompleter.completeError(obj);
-      }
-      if (_loadingUrlCompleter != null && !_loadingUrlCompleter!.isCompleted) {
-        _loadingUrlCompleter!.completeError(obj);
-        _loadingUrlCompleter = null;
       }
     }
 
@@ -595,18 +714,6 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
       }
       _lifeCycleObserver?.dispose();
     }
-
-    // Cancel any pending loadUrl operation
-    if (_loadingUrlCompleter != null && !_loadingUrlCompleter!.isCompleted) {
-      _loadingUrlCompleter!.completeError(
-        PlatformException(
-          code: 'video_player',
-          message: 'Player was disposed during loadUrl',
-        ),
-      );
-      _loadingUrlCompleter = null;
-    }
-
     _isDisposed = true;
     super.dispose();
   }
@@ -633,6 +740,18 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     await _applyLooping();
   }
 
+  /// Sets whether the screen is prevented from sleeping during video playback.
+  ///
+  /// See also [VideoPlayerValue.preventsDisplaySleepDuringVideoPlayback].
+  Future<void> setPreventsDisplaySleepDuringVideoPlayback(
+    bool preventsDisplaySleepDuringVideoPlayback,
+  ) async {
+    value = value.copyWith(
+      preventsDisplaySleepDuringVideoPlayback: preventsDisplaySleepDuringVideoPlayback,
+    );
+    await _applyPreventsDisplaySleepDuringVideoPlayback();
+  }
+
   /// Pauses the video.
   Future<void> pause() async {
     value = value.copyWith(isPlaying: false);
@@ -646,6 +765,16 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     await _videoPlayerPlatform.setLooping(_playerId, value.isLooping);
   }
 
+  Future<void> _applyPreventsDisplaySleepDuringVideoPlayback() async {
+    if (_isDisposedOrNotInitialized) {
+      return;
+    }
+    await _videoPlayerPlatform.setPreventsDisplaySleepDuringVideoPlayback(
+      _playerId,
+      value.preventsDisplaySleepDuringVideoPlayback,
+    );
+  }
+
   Future<void> _applyPlayPause() async {
     if (_isDisposedOrNotInitialized) {
       return;
@@ -654,9 +783,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
       await _videoPlayerPlatform.play(_playerId);
 
       _timer?.cancel();
-      _timer = Timer.periodic(const Duration(milliseconds: 100), (
-        Timer timer,
-      ) async {
+      _timer = Timer.periodic(const Duration(milliseconds: 100), (Timer timer) async {
         if (_isDisposed) {
           return;
         }
@@ -753,10 +880,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   ///   the plugin also reports errors.
   Future<void> setPlaybackSpeed(double speed) async {
     if (speed < 0) {
-      throw ArgumentError.value(
-        speed,
-        'Negative playback speeds are generally unsupported.',
-      );
+      throw ArgumentError.value(speed, 'Negative playback speeds are generally unsupported.');
     } else if (speed == 0) {
       throw ArgumentError.value(
         speed,
@@ -766,77 +890,6 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
 
     value = value.copyWith(playbackSpeed: speed);
     await _applyPlaybackSpeed();
-  }
-
-  /// Loads a new video from the specified URL without disposing the controller.
-  ///
-  /// **IMPORTANT**: This method only works with [VideoViewType.platformView].
-  /// If called with other view types, a warning will be logged and the method
-  /// will return without doing anything.
-  ///
-  /// This is more efficient than creating a new controller as it avoids player
-  /// instance recreation. The video's volume, playback speed, and looping state
-  /// are preserved, but playback state (position, buffering, etc.) is reset.
-  ///
-  /// The video will automatically start playing after loading.
-  ///
-  /// Currently only supported on iOS and macOS.
-  ///
-  /// Example:
-  /// ```dart
-  /// final controller = VideoPlayerController.networkUrl(
-  ///   Uri.parse('https://example.com/video1.mp4'),
-  ///   videoPlayerOptions: VideoPlayerOptions(
-  ///     viewType: VideoViewType.platformView,
-  ///   ),
-  /// );
-  /// await controller.initialize();
-  /// await controller.loadUrl('https://example.com/video2.mp4');
-  /// ```
-  Future<void> loadUrl(String url, {Map<String, String>? httpHeaders}) async {
-    if (_isDisposedOrNotInitialized) {
-      return;
-    }
-
-    // Stop the position update timer to prevent _updatePosition() from
-    // setting isCompleted=true when both position and duration are zero.
-    // The timer will be restarted by _applyPlayPause() after urlLoaded event.
-    _timer?.cancel();
-
-    _loadingUrlCompleter = Completer<void>();
-
-    value = value.copyWith(
-      duration: Duration.zero,
-      position: Duration.zero,
-      captionOffset: Duration.zero,
-      buffered: [],
-      isInitialized: false,
-      isPlaying: false,
-      isBuffering: false,
-      isCompleted: false,
-    );
-
-    await _videoPlayerPlatform.loadUrl(
-      _playerId,
-      url,
-      httpHeaders: httpHeaders,
-    );
-    await _loadingUrlCompleter!.future;
-    await play();
-  }
-
-  /// Returns whether Picture-in-Picture mode is currently active.
-  ///
-  /// This method is only supported on iOS when using [VideoViewType.platformView].
-  /// On unsupported platforms or view types, this returns `false`.
-  ///
-  /// Returns `true` if the video is currently playing in Picture-in-Picture mode,
-  /// `false` otherwise.
-  Future<bool> isPictureInPictureActive() async {
-    if (_isDisposedOrNotInitialized) {
-      return false;
-    }
-    return _videoPlayerPlatform.isPictureInPictureActive(_playerId);
   }
 
   /// Sets the caption offset.
@@ -849,10 +902,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   /// * >0: The caption will have a negative offset. So you will get caption text from the past.
   /// * <0: The caption will have a positive offset. So you will get caption text from the future.
   void setCaptionOffset(Duration offset) {
-    value = value.copyWith(
-      captionOffset: offset,
-      caption: _getCaptionAt(value.position),
-    );
+    value = value.copyWith(captionOffset: offset, caption: _getCaptionAt(value.position));
   }
 
   /// The closed caption based on the current [position] in the video.
@@ -862,20 +912,36 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   ///
   /// If no [closedCaptionFile] was specified, this will always return an empty
   /// [Caption].
+
   Caption _getCaptionAt(Duration position) {
-    if (_closedCaptionFile == null) {
+    final List<Caption>? sortedCaptions = _sortedCaptions;
+    if (_closedCaptionFile == null || sortedCaptions == null) {
       return Caption.none;
     }
 
     final Duration delayedPosition = position + value.captionOffset;
-    // TODO(johnsonmh): This would be more efficient as a binary search.
-    for (final Caption caption in _closedCaptionFile!.captions) {
-      if (caption.start <= delayedPosition && caption.end >= delayedPosition) {
-        return caption;
-      }
+
+    final int captionIndex = collection.binarySearch<Caption>(
+      sortedCaptions,
+      Caption(number: -1, start: delayedPosition, end: delayedPosition, text: ''),
+      compare: (Caption candidate, Caption search) {
+        if (search.start < candidate.start) {
+          return 1;
+        } else if (search.start > candidate.end) {
+          return -1;
+        } else {
+          // delayedPosition is within [candidate.start, candidate.end]
+          return 0;
+        }
+      },
+    );
+
+    // -1 means not found by the binary search.
+    if (captionIndex == -1) {
+      return Caption.none;
     }
 
-    return Caption.none;
+    return sortedCaptions[captionIndex];
   }
 
   /// Returns the file containing closed captions for the video, if any.
@@ -886,21 +952,36 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   /// Sets a closed caption file.
   ///
   /// If [closedCaptionFile] is null, closed captions will be removed.
-  Future<void> setClosedCaptionFile(
-    Future<ClosedCaptionFile>? closedCaptionFile,
-  ) async {
-    await _updateClosedCaptionWithFuture(closedCaptionFile);
+  Future<void> setClosedCaptionFile(Future<ClosedCaptionFile>? closedCaptionFile) async {
     _closedCaptionFileFuture = closedCaptionFile;
+    // Reset sorted captions to force re-sort when setting a new file
+    _sortedCaptions = null;
+    await _updateClosedCaptionWithFuture(closedCaptionFile);
   }
 
-  Future<void> _updateClosedCaptionWithFuture(
-    Future<ClosedCaptionFile>? closedCaptionFile,
-  ) async {
-    _closedCaptionFile = await closedCaptionFile;
-    value = value.copyWith(caption: _getCaptionAt(value.position));
+  Future<void> _updateClosedCaptionWithFuture(Future<ClosedCaptionFile>? closedCaptionFile) async {
+    if (closedCaptionFile != null) {
+      _closedCaptionFile = await closedCaptionFile;
+
+      // Only sort if we haven't sorted yet (first initialization)
+      _sortedCaptions ??= List<Caption>.from(_closedCaptionFile!.captions)
+        ..sort((Caption a, Caption b) {
+          return a.start.compareTo(b.start);
+        });
+
+      value = value.copyWith(caption: _getCaptionAt(value.position));
+    } else {
+      _closedCaptionFile = null;
+      _sortedCaptions = null;
+      value = value.copyWith(caption: Caption.none);
+    }
   }
 
   void _updatePosition(Duration position) {
+    // A pending platform seek or position request can complete after disposal.
+    if (_isDisposed) {
+      return;
+    }
     // The underlying native implementation on some platforms sometimes reports
     // a position slightly past the reported max duration. Clamp to the duration
     // to insulate clients from this behavior.
@@ -923,7 +1004,130 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     }
   }
 
+  /// Gets the available audio tracks for the video.
+  ///
+  /// Returns a list of [VideoAudioTrack] objects containing metadata about
+  /// each available audio track. The list may be empty if no audio tracks
+  /// are available or if the video is not initialized.
+  ///
+  /// Throws an error if the video player is disposed.
+  Future<List<VideoAudioTrack>> getAudioTracks() async {
+    if (_isDisposed) {
+      throw StateError('VideoPlayerController is disposed');
+    }
+    if (!value.isInitialized) {
+      return <VideoAudioTrack>[];
+    }
+    final List<platform_interface.VideoAudioTrack> platformTracks = await _videoPlayerPlatform
+        .getAudioTracks(_playerId);
+    return platformTracks.map(_convertPlatformAudioTrack).toList();
+  }
+
+  /// Selects which audio track is chosen for playback from its [trackId]
+  ///
+  /// The [trackId] should match the ID of one of the tracks returned by
+  /// [getAudioTracks]. If the track ID is not found or invalid, the
+  /// platform may ignore the request or throw an exception.
+  ///
+  /// Throws an error if the video player is disposed or not initialized.
+  Future<void> selectAudioTrack(String trackId) async {
+    if (_isDisposedOrNotInitialized) {
+      throw StateError('VideoPlayerController is disposed or not initialized');
+    }
+    // The platform implementation (e.g., Android) will wait for the track
+    // selection to complete by listening to platform-specific events
+    await _videoPlayerPlatform.selectAudioTrack(_playerId, trackId);
+  }
+
+  /// Returns whether audio track selection is supported on this platform.
+  ///
+  /// This method allows developers to query at runtime whether the current
+  /// platform supports audio track selection functionality. This is useful
+  /// for platforms like web where audio track selection may not be available.
+  ///
+  /// Returns `true` if [getAudioTracks] and [selectAudioTrack] are supported,
+  /// `false` otherwise.
+  ///
+  /// Example usage:
+  /// ```dart
+  /// if (controller.isAudioTrackSupportAvailable()) {
+  ///   final tracks = await controller.getAudioTracks();
+  ///   // Show audio track selection UI
+  /// } else {
+  ///   // Hide audio track selection UI or show unsupported message
+  /// }
+  /// ```
+  bool isAudioTrackSupportAvailable() {
+    return _videoPlayerPlatform.isAudioTrackSupportAvailable();
+  }
+
   bool get _isDisposedOrNotInitialized => _isDisposed || !value.isInitialized;
+
+  /// Gets the available video tracks for the video.
+  ///
+  /// The returned list contains a [VideoTrack] for each track available
+  /// for selection.
+  ///
+  /// For adaptive streams such as HLS or DASH, these often correspond to
+  /// different quality levels with different resolutions or bitrates.
+  /// For non-adaptive videos (MP4, MOV, etc.), platform implementations may
+  /// return one or more tracks, or an empty list, depending on the asset and
+  /// the metadata available.
+  ///
+  /// Note: On iOS 13-14, this returns an empty list as the AVAssetVariant API
+  /// requires iOS 15+. On web, this throws an [UnimplementedError].
+  ///
+  /// Check [isVideoTrackSupportAvailable] before calling this method to ensure
+  /// the platform supports video track selection.
+  Future<List<VideoTrack>> getVideoTracks() async {
+    if (_isDisposedOrNotInitialized) {
+      return <VideoTrack>[];
+    }
+    final List<platform_interface.VideoTrack> platformTracks = await _videoPlayerPlatform
+        .getVideoTracks(_playerId);
+    return platformTracks
+        .map((platform_interface.VideoTrack track) => VideoTrack._fromPlatform(track))
+        .toList();
+  }
+
+  /// Selects which video track is chosen for playback.
+  ///
+  /// Pass a [VideoTrack] to select a specific track.
+  /// Pass `null` to clear any manual selection and allow automatic selection.
+  ///
+  /// On iOS, this sets `preferredPeakBitRate` on the AVPlayerItem.
+  /// On Android, this uses ExoPlayer's track selection override.
+  /// On web, this throws an [UnimplementedError].
+  ///
+  /// Check [isVideoTrackSupportAvailable] before calling this method to ensure
+  /// the platform supports video track selection.
+  Future<void> selectVideoTrack(VideoTrack? track) async {
+    if (_isDisposedOrNotInitialized) {
+      return;
+    }
+    // Convert app-facing VideoTrack to platform interface VideoTrack
+    final platform_interface.VideoTrack? platformTrack = track != null
+        ? platform_interface.VideoTrack(
+            id: track.id,
+            isSelected: track.isSelected,
+            label: track.label,
+            bitrate: track.bitrate,
+            width: track.width,
+            height: track.height,
+            frameRate: track.frameRate,
+            codec: track.codec,
+          )
+        : null;
+    await _videoPlayerPlatform.selectVideoTrack(_playerId, platformTrack);
+  }
+
+  /// Whether video track selection is supported on this platform.
+  ///
+  /// Use this to check before calling [getVideoTracks] or [selectVideoTrack]
+  /// to avoid [UnimplementedError] exceptions on unsupported platforms.
+  bool isVideoTrackSupportAvailable() {
+    return _videoPlayerPlatform.isVideoTrackSupportAvailable();
+  }
 }
 
 class _VideoAppLifeCycleObserver extends Object with WidgetsBindingObserver {
@@ -1007,7 +1211,7 @@ class _VideoPlayerState extends State<VideoPlayer> {
         : _VideoPlayerWithRotation(
             rotation: widget.controller.value.rotationCorrection,
             child: _videoPlayerPlatform.buildViewWithOptions(
-              VideoViewOptions(playerId: _playerId),
+              platform_interface.VideoViewOptions(playerId: _playerId),
             ),
           );
   }
@@ -1075,11 +1279,7 @@ class VideoScrubber extends StatefulWidget {
   ///
   /// [controller] is the [VideoPlayerController] that will be controlled by
   /// this scrubber.
-  const VideoScrubber({
-    super.key,
-    required this.child,
-    required this.controller,
-  });
+  const VideoScrubber({super.key, required this.child, required this.controller});
 
   /// The widget that will be displayed inside the gesture detector.
   final Widget child;
@@ -1099,7 +1299,7 @@ class _VideoScrubberState extends State<VideoScrubber> {
   @override
   Widget build(BuildContext context) {
     void seekToRelativePosition(Offset globalPosition) {
-      final RenderBox box = context.findRenderObject()! as RenderBox;
+      final box = context.findRenderObject()! as RenderBox;
       final Offset tapPos = box.globalToLocal(globalPosition);
       final double relative = tapPos.dx / box.size.width;
       final Duration position = controller.value.duration * relative;
@@ -1125,8 +1325,7 @@ class _VideoScrubberState extends State<VideoScrubber> {
         seekToRelativePosition(details.globalPosition);
       },
       onHorizontalDragEnd: (DragEndDetails details) {
-        if (_controllerWasPlaying &&
-            controller.value.position != controller.value.duration) {
+        if (_controllerWasPlaying && controller.value.position != controller.value.duration) {
           controller.play();
         }
       },
@@ -1220,7 +1419,7 @@ class _VideoProgressIndicatorState extends State<VideoProgressIndicator> {
       final double maxBuffering = duration == 0.0
           ? 0.0
           : controller.value.buffered
-                    .map((DurationRange range) => range.end.inMilliseconds)
+                    .map((platform_interface.DurationRange range) => range.end.inMilliseconds)
                     .fold(0, math.max) /
                 duration;
       progressIndicator = Stack(
@@ -1249,10 +1448,7 @@ class _VideoProgressIndicatorState extends State<VideoProgressIndicator> {
       child: progressIndicator,
     );
     if (widget.allowScrubbing) {
-      return VideoScrubber(
-        controller: controller,
-        child: paddedProgressIndicator,
-      );
+      return VideoScrubber(controller: controller, child: paddedProgressIndicator);
     } else {
       return paddedProgressIndicator;
     }
@@ -1304,9 +1500,7 @@ class ClosedCaption extends StatelessWidget {
 
     final TextStyle effectiveTextStyle =
         textStyle ??
-        DefaultTextStyle.of(
-          context,
-        ).style.copyWith(fontSize: 36.0, color: Colors.white);
+        DefaultTextStyle.of(context).style.copyWith(fontSize: 36.0, color: Colors.white);
 
     return Align(
       alignment: Alignment.bottomCenter,
@@ -1325,4 +1519,109 @@ class ClosedCaption extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Represents a video track in a video with its metadata.
+///
+/// For HLS/DASH adaptive streams, each [VideoTrack] represents a different
+/// quality level (e.g., 1080p, 720p, 480p). For non-adaptive videos, platform
+/// implementations may return a single track or no tracks, depending on the
+/// metadata that is available.
+@immutable
+class VideoTrack {
+  /// Constructs an instance of [VideoTrack].
+  const VideoTrack({
+    required this.id,
+    required this.isSelected,
+    this.label,
+    this.bitrate,
+    this.width,
+    this.height,
+    this.frameRate,
+    this.codec,
+  });
+
+  /// Creates a [VideoTrack] from a platform interface [VideoTrack].
+  factory VideoTrack._fromPlatform(platform_interface.VideoTrack track) {
+    return VideoTrack(
+      id: track.id,
+      isSelected: track.isSelected,
+      label: track.label,
+      bitrate: track.bitrate,
+      width: track.width,
+      height: track.height,
+      frameRate: track.frameRate,
+      codec: track.codec,
+    );
+  }
+
+  /// Unique identifier for the video track.
+  ///
+  /// The format is platform-specific:
+  /// - Android: `"{groupIndex}_{trackIndex}"` (e.g., `"0_2"`)
+  /// - iOS: `"variant_{bitrate}"` for HLS adaptive streams
+  final String id;
+
+  /// Whether this track is currently selected.
+  final bool isSelected;
+
+  /// Human-readable label for the track (e.g., "1080p", "720p").
+  ///
+  /// May be null if not available from the platform.
+  final String? label;
+
+  /// Bitrate of the video track in bits per second.
+  ///
+  /// May be null if not available from the platform.
+  final int? bitrate;
+
+  /// Video width in pixels.
+  ///
+  /// May be null if not available from the platform.
+  final int? width;
+
+  /// Video height in pixels.
+  ///
+  /// May be null if not available from the platform.
+  final int? height;
+
+  /// Frame rate in frames per second.
+  ///
+  /// May be null if not available from the platform.
+  final double? frameRate;
+
+  /// Video codec used (e.g., "avc1", "hevc", "vp9").
+  ///
+  /// May be null if not available from the platform.
+  final String? codec;
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is VideoTrack &&
+            runtimeType == other.runtimeType &&
+            id == other.id &&
+            isSelected == other.isSelected &&
+            label == other.label &&
+            bitrate == other.bitrate &&
+            width == other.width &&
+            height == other.height &&
+            frameRate == other.frameRate &&
+            codec == other.codec;
+  }
+
+  @override
+  int get hashCode => Object.hash(id, isSelected, label, bitrate, width, height, frameRate, codec);
+
+  @override
+  String toString() =>
+      'VideoTrack('
+      'id: $id, '
+      'isSelected: $isSelected, '
+      'label: $label, '
+      'bitrate: $bitrate, '
+      'width: $width, '
+      'height: $height, '
+      'frameRate: $frameRate, '
+      'codec: $codec)';
 }
