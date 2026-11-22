@@ -323,6 +323,136 @@ void main() {
       verify(playerApi.pause());
     });
 
+    group('isPictureInPictureActive', () {
+      test('returns false for texture view', () async {
+        final (
+          AVFoundationVideoPlayer player,
+          MockAVFoundationVideoPlayerApi api,
+          MockVideoPlayerInstanceApi playerApi,
+        ) = setUpMockPlayer(
+          playerId: 1,
+        );
+
+        const int newPlayerId = 2;
+        const int textureId = 100;
+        when(api.createForTextureView(any))
+            .thenAnswer((_) async => TexturePlayerIds(playerId: newPlayerId, textureId: textureId));
+
+        await player.createWithOptions(
+          VideoCreationOptions(
+            dataSource: DataSource(sourceType: DataSourceType.file, uri: 'file:///foo/bar'),
+            viewType: VideoViewType.textureView,
+          ),
+        );
+
+        final bool isActive = await player.isPictureInPictureActive(newPlayerId);
+        expect(isActive, false);
+        verifyNever(playerApi.isPictureInPictureActive());
+      });
+
+      test('queries native for platform view', () async {
+        final (
+          AVFoundationVideoPlayer player,
+          MockAVFoundationVideoPlayerApi api,
+          MockVideoPlayerInstanceApi playerApi,
+        ) = setUpMockPlayer(
+          playerId: 1,
+        );
+
+        const int newPlayerId = 2;
+        when(api.createForPlatformView(any)).thenAnswer((_) async => newPlayerId);
+        when(playerApi.isPictureInPictureActive()).thenAnswer((_) async => true);
+
+        await player.createWithOptions(
+          VideoCreationOptions(
+            dataSource: DataSource(sourceType: DataSourceType.file, uri: 'file:///foo/bar'),
+            viewType: VideoViewType.platformView,
+          ),
+        );
+
+        final bool isActive = await player.isPictureInPictureActive(newPlayerId);
+        expect(isActive, true);
+        verify(playerApi.isPictureInPictureActive());
+      });
+
+      test('returns false when PiP is not active', () async {
+        final (
+          AVFoundationVideoPlayer player,
+          MockAVFoundationVideoPlayerApi api,
+          MockVideoPlayerInstanceApi playerApi,
+        ) = setUpMockPlayer(
+          playerId: 1,
+        );
+
+        const int newPlayerId = 2;
+        when(api.createForPlatformView(any)).thenAnswer((_) async => newPlayerId);
+        when(playerApi.isPictureInPictureActive()).thenAnswer((_) async => false);
+
+        await player.createWithOptions(
+          VideoCreationOptions(
+            dataSource: DataSource(sourceType: DataSourceType.file, uri: 'file:///foo/bar'),
+            viewType: VideoViewType.platformView,
+          ),
+        );
+
+        final bool isActive = await player.isPictureInPictureActive(newPlayerId);
+        expect(isActive, false);
+      });
+    });
+
+    group('loadUrl', () {
+      test('calls native loadUrl', () async {
+        final (
+          AVFoundationVideoPlayer player,
+          MockAVFoundationVideoPlayerApi api,
+          MockVideoPlayerInstanceApi playerApi,
+        ) = setUpMockPlayer(
+          playerId: 1,
+        );
+
+        const int newPlayerId = 2;
+        when(api.createForPlatformView(any)).thenAnswer((_) async => newPlayerId);
+        when(playerApi.loadUrl(any, any)).thenAnswer((_) async {});
+
+        await player.createWithOptions(
+          VideoCreationOptions(
+            dataSource: DataSource(sourceType: DataSourceType.file, uri: 'file:///foo/bar'),
+            viewType: VideoViewType.platformView,
+          ),
+        );
+
+        const String url = 'https://example.com/video.mp4';
+        await player.loadUrl(newPlayerId, url);
+        verify(playerApi.loadUrl(url, <String, String>{}));
+      });
+
+      test('passes http headers', () async {
+        final (
+          AVFoundationVideoPlayer player,
+          MockAVFoundationVideoPlayerApi api,
+          MockVideoPlayerInstanceApi playerApi,
+        ) = setUpMockPlayer(
+          playerId: 1,
+        );
+
+        const int newPlayerId = 2;
+        when(api.createForPlatformView(any)).thenAnswer((_) async => newPlayerId);
+        when(playerApi.loadUrl(any, any)).thenAnswer((_) async {});
+
+        await player.createWithOptions(
+          VideoCreationOptions(
+            dataSource: DataSource(sourceType: DataSourceType.file, uri: 'file:///foo/bar'),
+            viewType: VideoViewType.platformView,
+          ),
+        );
+
+        const String url = 'https://example.com/video.mp4';
+        const Map<String, String> headers = <String, String>{'Authorization': 'Bearer token'};
+        await player.loadUrl(newPlayerId, url, httpHeaders: headers);
+        verify(playerApi.loadUrl(url, headers));
+      });
+    });
+
     group('setMixWithOthers', () {
       test('passes true', () async {
         final (AVFoundationVideoPlayer player, MockAVFoundationVideoPlayerApi api, _) =

@@ -195,6 +195,14 @@ abstract class VideoPlayerPlatform extends PlatformInterface {
   bool isVideoTrackSupportAvailable() {
     return false;
   }
+
+  /// Replaces the media on this player, preserving volume, speed, and looping.
+  Future<void> loadUrl(int playerId, String url, {Map<String, String>? httpHeaders}) {
+    throw UnimplementedError('loadUrl() has not been implemented.');
+  }
+
+  /// Whether the native player is currently in OS picture-in-picture.
+  Future<bool> isPictureInPictureActive(int playerId) async => false;
 }
 
 class _PlaceholderImplementation extends VideoPlayerPlatform {}
@@ -372,6 +380,9 @@ enum VideoEventType {
   ///
   /// A maximum of one event of this type may be emitted per instance.
   initialized,
+
+  /// The replacement media is ready on the existing player.
+  urlLoaded,
 
   /// The playback has ended.
   completed,

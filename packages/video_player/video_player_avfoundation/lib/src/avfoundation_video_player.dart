@@ -138,6 +138,14 @@ class AVFoundationVideoPlayer extends VideoPlayerPlatform {
   }
 
   @override
+  Future<void> loadUrl(int playerId, String url, {Map<String, String>? httpHeaders}) =>
+      _playerWith(id: playerId).loadUrl(url, httpHeaders ?? <String, String>{});
+
+  @override
+  Future<bool> isPictureInPictureActive(int playerId) =>
+      _playerWith(id: playerId).isPictureInPictureActive();
+
+  @override
   Future<void> play(int playerId) {
     return _playerWith(id: playerId).play();
   }
@@ -346,6 +354,16 @@ class _PlayerInstance {
       StreamController<VideoEvent>.broadcast();
   StreamSubscription<dynamic>? _eventSubscription;
 
+  bool _isReplacingMedia = false;
+
+  Future<void> loadUrl(String url, Map<String, String> headers) {
+    _isReplacingMedia = true;
+    return _api.loadUrl(url, headers);
+  }
+
+  Future<bool> isPictureInPictureActive() async =>
+      viewState is VideoPlayerPlatformViewState && await _api.isPictureInPictureActive();
+
   Future<void> play() => _api.play();
 
   Future<void> pause() => _api.pause();
@@ -405,7 +423,7 @@ class _PlayerInstance {
         :final double height,
       ) =>
         VideoEvent(
-          eventType: VideoEventType.initialized,
+          eventType: _isReplacingMedia ? VideoEventType.urlLoaded : VideoEventType.initialized,
           duration: Duration(milliseconds: durationMilliseconds),
           size: Size(width, height),
         ),

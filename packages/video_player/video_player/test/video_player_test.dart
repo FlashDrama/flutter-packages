@@ -57,6 +57,12 @@ class FakeController extends ValueNotifier<VideoPlayerValue> implements VideoPla
   Future<void> setVolume(double volume) async {}
 
   @override
+  Future<void> loadUrl(String url, {Map<String, String>? httpHeaders}) async {}
+
+  @override
+  Future<bool> isPictureInPictureActive() async => false;
+
+  @override
   Future<void> setPlaybackSpeed(double speed) async {}
 
   @override
@@ -569,6 +575,27 @@ void main() {
           expect(controller.value.hasError, equals(false));
         },
       );
+    });
+
+    test('loadUrl reuses the player and autoplays even if readiness precedes the reply', () async {
+      final controller = VideoPlayerController.networkUrl(_localhostUri);
+      addTearDown(controller.dispose);
+      await controller.initialize();
+      await controller.setPlaybackSpeed(1.5);
+      await controller.setVolume(0.4);
+      await controller.setLooping(true);
+      final int id = controller.playerId;
+      final headers = <String, String>{'Referer': 'https://example.org'};
+      await controller.loadUrl('https://example.org/next.m3u8', httpHeaders: headers);
+      expect(fakeVideoPlayerPlatform.replacement, (id, 'https://example.org/next.m3u8', headers));
+      expect(fakeVideoPlayerPlatform.dataSources, hasLength(1));
+      expect(controller.value.duration, const Duration(seconds: 12));
+      expect(controller.value.position, Duration.zero);
+      expect(controller.value.isPlaying, isTrue);
+      expect(controller.value.isLooping, isTrue);
+      expect(controller.value.volume, 0.4);
+      expect(controller.value.playbackSpeed, 1.5);
+      expect(fakeVideoPlayerPlatform.calls.last, 'setPlaybackSpeed');
     });
 
     test('contentUri', () async {
@@ -2060,6 +2087,17 @@ void main() {
 }
 
 class FakeVideoPlayerPlatform extends VideoPlayerPlatform {
+  (int, String, Map<String, String>?)? replacement;
+
+  @override
+  Future<void> loadUrl(int playerId, String url, {Map<String, String>? httpHeaders}) async {
+    replacement = (playerId, url, httpHeaders);
+    streams[playerId]!.add(
+      VideoEvent(eventType: VideoEventType.urlLoaded, duration: const Duration(seconds: 12)),
+    );
+    await Future<void>.delayed(Duration.zero);
+  }
+
   Completer<bool> initialized = Completer<bool>();
   Completer<void>? seekCompleter;
   List<String> calls = <String>[];

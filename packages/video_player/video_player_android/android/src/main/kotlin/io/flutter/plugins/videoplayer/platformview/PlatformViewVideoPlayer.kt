@@ -12,6 +12,7 @@ import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import io.flutter.plugins.videoplayer.ExoPlayerEventListener
+import io.flutter.plugins.videoplayer.PictureInPictureController
 import io.flutter.plugins.videoplayer.VideoAsset
 import io.flutter.plugins.videoplayer.VideoPlayer
 import io.flutter.plugins.videoplayer.VideoPlayerCallbacks
@@ -28,11 +29,28 @@ internal class PlatformViewVideoPlayer // TODO: Migrate to stable API, see
 @OptIn(UnstableApi::class)
 @VisibleForTesting
 constructor(
+    context: Context,
     events: VideoPlayerCallbacks,
     mediaItem: MediaItem,
     options: VideoPlayerOptions,
     exoPlayerProvider: () -> ExoPlayer
-) : VideoPlayer(events, mediaItem, options, /* surfaceProducer */ null, exoPlayerProvider) {
+) :
+    VideoPlayer(
+        context, events, mediaItem, options, /* surfaceProducer */ null, exoPlayerProvider) {
+  val pictureInPicture = PictureInPictureController(exoPlayer)
+
+  init {
+    exoPlayer.addListener(pictureInPicture)
+  }
+
+  override fun isPictureInPictureActive() = pictureInPicture.isPictureInPictureActive()
+
+  override fun dispose() {
+    exoPlayer.removeListener(pictureInPicture)
+    pictureInPicture.onDispose()
+    super.dispose()
+  }
+
   override fun createExoPlayerEventListener(
       exoPlayer: ExoPlayer,
       surfaceProducer: SurfaceProducer?
@@ -58,7 +76,7 @@ constructor(
         asset: VideoAsset,
         options: VideoPlayerOptions
     ): PlatformViewVideoPlayer {
-      return PlatformViewVideoPlayer(events, asset.mediaItem, options) {
+      return PlatformViewVideoPlayer(context, events, asset.mediaItem, options) {
         val builder = ExoPlayer.Builder(context)
         val backBufferDurationMs = options.backBufferDurationMs
         if (backBufferDurationMs != null) {

@@ -154,6 +154,14 @@ class AndroidVideoPlayer extends VideoPlayerPlatform {
   }
 
   @override
+  Future<void> loadUrl(int playerId, String url, {Map<String, String>? httpHeaders}) =>
+      _playerWith(id: playerId).loadUrl(url, httpHeaders ?? <String, String>{});
+
+  @override
+  Future<bool> isPictureInPictureActive(int playerId) =>
+      _playerWith(id: playerId).isPictureInPictureActive();
+
+  @override
   Future<void> play(int playerId) {
     return _playerWith(id: playerId).play();
   }
@@ -347,6 +355,16 @@ class _PlayerInstance {
     return _api.setLooping(looping);
   }
 
+  bool _isReplacingMedia = false;
+
+  Future<void> loadUrl(String url, Map<String, String> headers) {
+    _isReplacingMedia = true;
+    return _api.loadUrl(url, headers);
+  }
+
+  Future<bool> isPictureInPictureActive() async =>
+      viewState is VideoPlayerPlatformViewState && await _api.isPictureInPictureActive();
+
   Future<void> play() {
     return _api.play();
   }
@@ -531,7 +549,7 @@ class _PlayerInstance {
       case InitializationEvent _:
         _eventStreamController.add(
           VideoEvent(
-            eventType: VideoEventType.initialized,
+            eventType: _isReplacingMedia ? VideoEventType.urlLoaded : VideoEventType.initialized,
             duration: Duration(milliseconds: event.duration),
             size: Size(event.width.toDouble(), event.height.toDouble()),
             rotationCorrection: event.rotationCorrection,
@@ -540,6 +558,7 @@ class _PlayerInstance {
 
         // Start polling for buffer position, since there is no buffer position
         // event to listen to.
+        _bufferPollingTimer?.cancel();
         _bufferPollingTimer = Timer.periodic(const Duration(seconds: 1), (Timer timer) async {
           final int position = await _api.getBufferedPosition();
           if (!_isDisposed) {

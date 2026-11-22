@@ -164,6 +164,10 @@ abstract class AVFoundationVideoPlayerApi {
 
 @HostApi()
 abstract class VideoPlayerInstanceApi {
+  @async
+  void loadUrl(String url, Map<String, String> httpHeaders);
+  bool isPictureInPictureActive();
+
   @SwiftFunction('setLooping(_:)')
   void setLooping(bool looping);
   @SwiftFunction('setVolume(_:)')

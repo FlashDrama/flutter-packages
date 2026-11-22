@@ -31,13 +31,14 @@ internal class TextureVideoPlayer
 @OptIn(UnstableApi::class)
 @VisibleForTesting
 constructor(
+    context: Context,
     events: VideoPlayerCallbacks,
     surfaceProducer: SurfaceProducer,
     mediaItem: MediaItem,
     options: VideoPlayerOptions,
     exoPlayerProvider: () -> ExoPlayer
 ) :
-    VideoPlayer(events, mediaItem, options, surfaceProducer, exoPlayerProvider),
+    VideoPlayer(context, events, mediaItem, options, surfaceProducer, exoPlayerProvider),
     SurfaceProducer.Callback {
   // True when the ExoPlayer instance has a null surface.
   private var needsSurface = true
@@ -109,7 +110,7 @@ constructor(
         asset: VideoAsset,
         options: VideoPlayerOptions
     ): TextureVideoPlayer {
-      return TextureVideoPlayer(events, surfaceProducer, asset.mediaItem, options) {
+      return TextureVideoPlayer(context, events, surfaceProducer, asset.mediaItem, options) {
         val builder = ExoPlayer.Builder(context)
         val backBufferDurationMs = options.backBufferDurationMs
         if (backBufferDurationMs != null) {

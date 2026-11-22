@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 package io.flutter.plugins.videoplayer
 
+import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import androidx.annotation.OptIn
@@ -32,6 +33,7 @@ internal abstract class VideoPlayer
 // https://github.com/flutter/packages/pull/10193
 @Suppress("this-escape")
 constructor(
+    private val context: Context,
     protected val videoPlayerEvents: VideoPlayerCallbacks,
     mediaItem: MediaItem,
     options: VideoPlayerOptions,
@@ -333,6 +335,18 @@ constructor(
     trackSelector.setParameters(
         trackSelector.buildUponParameters().setOverrideForType(override).build())
   }
+
+  @OptIn(UnstableApi::class)
+  override fun loadUrl(url: String, httpHeaders: Map<String, String>) {
+    val asset = VideoAsset.fromRemoteUrl(url, VideoAsset.StreamingFormat.UNKNOWN, httpHeaders, null)
+    val source = asset.getMediaSourceFactory(context).createMediaSource(asset.mediaItem)
+    exoPlayer.pause()
+    exoPlayerEventListener?.prepareForUrlLoad()
+    exoPlayer.setMediaSource(source)
+    exoPlayer.prepare()
+  }
+
+  override fun isPictureInPictureActive() = false
 
   open fun dispose() {
     isDisposed = true

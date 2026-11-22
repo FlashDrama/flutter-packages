@@ -1,3 +1,7 @@
+## 2.13.0+flashdrama.1
+
+* Retains automatic Android picture-in-picture for platform views and in-place URL replacement.
+
 ## 2.13.0
 
 * Converts native implementation code to Kotlin.

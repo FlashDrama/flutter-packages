@@ -31,6 +31,14 @@ class VideoPlayerInstanceBridge: VideoPlayerInstanceApi {
     self.player = player
   }
 
+  func loadUrl(url: String, httpHeaders: [String: String]) async throws {
+    try await player?.loadUrl(url, headers: httpHeaders)
+  }
+
+  func isPictureInPictureActive() throws -> Bool {
+    MainActor.assumeIsolated { player?.nativeView?.isPictureInPictureActive ?? false }
+  }
+
   func setLooping(_ looping: Bool) throws {
     MainActor.assumeIsolated {
       player?.setLooping(looping)
@@ -116,6 +124,7 @@ class VideoPlayerInstanceBridge: VideoPlayerInstanceApi {
 // annotations. See TODO on VideoPlayerInstanceBridge above.
 @MainActor
 class VideoPlayer: NSObject {
+  weak var nativeView: FVPNativeVideoView?
   /// The AVPlayer instance used for video playback.
   let player: AVPlayer
   /// The VideoPlayerInstanceApi implementation that forwards calls to this object.
@@ -145,8 +154,7 @@ class VideoPlayer: NSObject {
   /// AVPlayerItem is ready to play and the event listener is set to a non-nil value, whichever occurs
   /// last.
   ///
-  /// This flag is set to true when the "initialized" message is first sent, and is never set to
-  /// false again.
+  /// Reset when the current item is replaced so the new item's readiness is delivered once.
   private var isInitialized = false
 
   private var keyValueObservations: [NSKeyValueObservation] = []
@@ -160,8 +168,6 @@ class VideoPlayer: NSObject {
     viewProvider: FVPViewProvider
   ) {
     self.viewProvider = viewProvider
-
-    let asset = playerItem.asset
 
     player = avFactory.player(with: playerItem)
     player.actionAtItemEnd = .none
@@ -201,6 +207,11 @@ class VideoPlayer: NSObject {
 
     hostApiBridge = VideoPlayerInstanceBridge(player: self)
 
+    configureVideoComposition(for: playerItem)
+  }
+
+  private func configureVideoComposition(for playerItem: WrappedAVPlayerItem) {
+    let asset = playerItem.asset
     Task { @MainActor [weak self] in
       do {
         let tracks = try await asset.load(.tracks, isolation: #isolation)
@@ -245,7 +256,7 @@ class VideoPlayer: NSObject {
     {
       // If the item is already ready to play, ensure that the intialized event is sent first.
       await reportStatus(playerItem: item)
-      if disposed { return }
+      guard !disposed, player.currentItem === item else { return }
       // Set up all necessary observers to report video events.
       // In theory these callbacks should all be on the main thread, so could use
       // MainActor.assumeIsolated instead, but for now use Tasks in case they
@@ -256,7 +267,7 @@ class VideoPlayer: NSObject {
           options: [.new]
         ) { [weak self] object, _ in
           Task { @MainActor in
-            guard let self = self else { return }
+            guard let self, !self.disposed, self.player.currentItem === object else { return }
             let values = object.loadedTimeRanges.map { rangeValue in
               let range = rangeValue.timeRangeValue
               return PlatformDurationRange(
@@ -274,7 +285,7 @@ class VideoPlayer: NSObject {
           options: [.new]
         ) { [weak self] object, _ in
           Task { @MainActor in
-            guard let self = self else { return }
+            guard let self, !self.disposed, self.player.currentItem === object else { return }
             self.updatePlayingState()
             if object.isPlaybackLikelyToKeepUp {
               self.eventListener?.videoPlayerDidEndBuffering()
@@ -322,6 +333,25 @@ class VideoPlayer: NSObject {
 
   // MARK: VideoPlayerInstanceApi
 
+  func loadUrl(_ uri: String, headers: [String: String]) async throws {
+    guard let url = URL(string: uri), let listener = eventListener, !disposed else {
+      throw PigeonError(
+        code: "video_player", message: "Invalid URL or inactive player", details: nil)
+    }
+    let options = headers.isEmpty ? nil : ["AVURLAssetHTTPHeaderFieldsKey": headers]
+    let item = AVPlayerItem(asset: AVURLAsset(url: url, options: options))
+    removeObservers()
+    pause()
+    if let previous = player.currentItem, previous.outputs.contains(pixelBufferSource.videoOutput) {
+      previous.remove(pixelBufferSource.videoOutput)
+    }
+    isInitialized = false
+    preferredTransform = .identity
+    player.replaceCurrentItem(with: item)
+    configureVideoComposition(for: DefaultAVPlayerItem(playerItem: item))
+    await setEventListener(listener)
+  }
+
   func setLooping(_ looping: Bool) {
     isLooping = looping
   }
@@ -368,17 +398,19 @@ class VideoPlayer: NSObject {
     if disposed { return }
     disposed = true
 
-    // Remove all observers.
+    removeObservers()
+    player.replaceCurrentItem(with: nil)
+
+    onDisposed?()
+    eventListener?.videoPlayerWasDisposed()
+  }
+
+  private func removeObservers() {
     if let playToEndObserver {
       NotificationCenter.default.removeObserver(playToEndObserver)
       self.playToEndObserver = nil
     }
     keyValueObservations.removeAll()
-
-    player.replaceCurrentItem(with: nil)
-
-    onDisposed?()
-    eventListener?.videoPlayerWasDisposed()
   }
 
   func getAudioTracks() async throws -> [MediaSelectionAudioTrackData] {
@@ -524,6 +556,7 @@ class VideoPlayer: NSObject {
   // MARK: Private
 
   private func itemDidPlayToEndTime(_ item: AVPlayerItem) {
+    guard player.currentItem === item else { return }
     if isLooping {
       item.seek(to: .zero) { _ in }
     } else {
@@ -595,6 +628,7 @@ class VideoPlayer: NSObject {
     assert(
       eventListener != nil,
       "\(#function) was called when the event listener was not set.")
+    guard !disposed, player.currentItem === item else { return }
     switch item.status {
     case .failed:
       sendFailedToLoadVideoEvent()
@@ -663,6 +697,7 @@ class VideoPlayer: NSObject {
     assert(!isInitialized, "\(#function) should only be called once.")
     isInitialized = true
     let duration = await duration()
+    guard !disposed, player.currentItem === currentItem else { return }
     eventListener?.videoPlayerDidInitialize(
       withDuration: duration, size: currentItem?.presentationSize ?? .zero)
   }

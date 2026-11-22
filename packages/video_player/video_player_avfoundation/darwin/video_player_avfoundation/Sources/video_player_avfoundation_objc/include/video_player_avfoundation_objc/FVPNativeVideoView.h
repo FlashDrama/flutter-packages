@@ -19,6 +19,7 @@ NS_ASSUME_NONNULL_BEGIN
 #else
 @interface FVPNativeVideoView : NSView
 #endif
+@property(nonatomic, readonly) BOOL isPictureInPictureActive;
 /// Initializes a new instance of a native view.
 /// It creates a video view instance and sets the provided AVPlayer instance to it.
 - (instancetype)initWithPlayer:(AVPlayer *)player;

@@ -76,7 +76,7 @@ public final class VideoPlayerTest {
         @NonNull VideoPlayerOptions options,
         @Nullable SurfaceProducer surfaceProducer,
         @NonNull Function0<? extends ExoPlayer> exoPlayerProvider) {
-      super(events, mediaItem, options, surfaceProducer, exoPlayerProvider);
+      super(androidx.test.core.app.ApplicationProvider.getApplicationContext(), events, mediaItem, options, surfaceProducer, exoPlayerProvider);
     }
 
     @NonNull

@@ -47,6 +47,12 @@ internal abstract class ExoPlayerEventListener(
 
   protected abstract fun sendInitialized()
 
+  fun prepareForUrlLoad() {
+    mainHandler.removeCallbacks(initializationFallback)
+    isWaitingForValidDuration = false
+    isInitialized = false
+  }
+
   /** Cancels pending initialization callbacks when the player is disposed. */
   fun dispose() {
     isWaitingForValidDuration = false

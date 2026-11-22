@@ -58,11 +58,12 @@ class MockAVFoundationVideoPlayerApi extends _i1.Mock implements _i2.AVFoundatio
   ) as _i4.Future<void>);
 
   @override
-  _i4.Future<int> createForPlatformView(_i2.CreationOptions? params) => (super.noSuchMethod(
-    Invocation.method(#createForPlatformView, [params]),
-    returnValue: _i4.Future<int>.value(0),
-    returnValueForMissingStub: _i4.Future<int>.value(0),
-  ) as _i4.Future<int>);
+  _i4.Future<int> createForPlatformView(_i2.CreationOptions? creationOptions) =>
+      (super.noSuchMethod(
+        Invocation.method(#createForPlatformView, [creationOptions]),
+        returnValue: _i4.Future<int>.value(0),
+        returnValueForMissingStub: _i4.Future<int>.value(0),
+      ) as _i4.Future<int>);
 
   @override
   _i4.Future<_i2.TexturePlayerIds> createForTextureView(
@@ -105,6 +106,20 @@ class MockVideoPlayerInstanceApi extends _i1.Mock implements _i2.VideoPlayerInst
       Invocation.getter(#pigeonVar_messageChannelSuffix),
     ),
   ) as String);
+
+  @override
+  _i4.Future<void> loadUrl(String? url, Map<String, String>? httpHeaders) => (super.noSuchMethod(
+    Invocation.method(#loadUrl, [url, httpHeaders]),
+    returnValue: _i4.Future<void>.value(),
+    returnValueForMissingStub: _i4.Future<void>.value(),
+  ) as _i4.Future<void>);
+
+  @override
+  _i4.Future<bool> isPictureInPictureActive() => (super.noSuchMethod(
+    Invocation.method(#isPictureInPictureActive, []),
+    returnValue: _i4.Future<bool>.value(false),
+    returnValueForMissingStub: _i4.Future<bool>.value(false),
+  ) as _i4.Future<bool>);
 
   @override
   _i4.Future<void> setLooping(bool? looping) => (super.noSuchMethod(

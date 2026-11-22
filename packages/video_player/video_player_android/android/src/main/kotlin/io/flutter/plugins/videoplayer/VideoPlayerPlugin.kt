@@ -3,15 +3,22 @@
 // found in the LICENSE file.
 package io.flutter.plugins.videoplayer
 
+import android.app.Activity
 import android.content.Context
+import android.os.Build
 import android.util.LongSparseArray
 import androidx.annotation.VisibleForTesting
 import androidx.core.util.forEach
 import androidx.core.util.isEmpty
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import io.flutter.FlutterInjector
 import io.flutter.Log
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.FlutterPlugin.FlutterPluginBinding
+import io.flutter.embedding.engine.plugins.activity.ActivityAware
+import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
+import io.flutter.embedding.engine.plugins.lifecycle.FlutterLifecycleAdapter
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugins.videoplayer.AndroidVideoPlayerApi.Companion.setUp
 import io.flutter.plugins.videoplayer.VideoPlayerInstanceApi.Companion.setUp
@@ -39,7 +46,41 @@ internal typealias TexturePlayerConstructor =
 /** Android platform implementation of the VideoPlayerPlugin. */
 class VideoPlayerPlugin
 /** Register this with the v2 embedding for the plugin to respond to lifecycle callbacks. */
-: FlutterPlugin, AndroidVideoPlayerApi {
+: FlutterPlugin, AndroidVideoPlayerApi, ActivityAware, DefaultLifecycleObserver {
+  private var activityBinding: ActivityPluginBinding? = null
+
+  override fun onAttachedToActivity(binding: ActivityPluginBinding) {
+    activityBinding = binding
+    FlutterLifecycleAdapter.getActivityLifecycle(binding).addObserver(this)
+    updateActivity(binding.activity)
+  }
+
+  override fun onDetachedFromActivity() {
+    activityBinding?.let { FlutterLifecycleAdapter.getActivityLifecycle(it).removeObserver(this) }
+    updateActivity(null)
+    activityBinding = null
+  }
+
+  override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) =
+      onAttachedToActivity(binding)
+
+  override fun onDetachedFromActivityForConfigChanges() = onDetachedFromActivity()
+
+  private fun updateActivity(activity: Activity?) {
+    videoPlayers.forEach { _, player ->
+      (player as? PlatformViewVideoPlayer)?.pictureInPicture?.setActivity(activity)
+    }
+  }
+
+  override fun onPause(owner: LifecycleOwner) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+      videoPlayers.forEach { _, player ->
+        (player as? PlatformViewVideoPlayer)?.pictureInPicture?.enterIfPlaying()
+      }
+    }
+  }
+
   private val videoPlayers = LongSparseArray<VideoPlayer>()
   private var flutterState: FlutterState? = null
   private val sharedOptions = VideoPlayerOptions()
@@ -118,13 +159,14 @@ class VideoPlayerPlugin
     val playerOptions = VideoPlayerOptions(sharedOptions)
     playerOptions.backBufferDurationMs = options.backBufferDurationMs
 
-    val videoPlayer: VideoPlayer =
+    val videoPlayer =
         createPlatformViewPlayer(
             flutterState.applicationContext,
             VideoPlayerEventCallbacks.bindTo(flutterState.binaryMessenger, streamInstance),
             videoAsset,
             playerOptions)
 
+    activityBinding?.let { videoPlayer.pictureInPicture.setActivity(it.activity) }
     registerPlayerInstance(videoPlayer, id, flutterState.binaryMessenger)
     return id
   }

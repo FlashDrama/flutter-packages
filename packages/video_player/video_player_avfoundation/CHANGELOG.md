@@ -1,3 +1,7 @@
+## 2.12.4+flashdrama.1
+
+* Retains inline iOS picture-in-picture, foreground restoration and in-place URL replacement.
+
 ## 2.12.4
 
 * Converts internal event channel implementation to Swift.

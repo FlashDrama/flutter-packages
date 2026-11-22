@@ -1042,6 +1042,8 @@ class AVFoundationVideoPlayerApiSetup {
 }
 /// Generated protocol from Pigeon that represents a handler of messages from Flutter.
 protocol VideoPlayerInstanceApi {
+  func loadUrl(url: String, httpHeaders: [String: String]) async throws
+  func isPictureInPictureActive() throws -> Bool
   func setLooping(_ looping: Bool) throws
   func setVolume(_ volume: Double) throws
   func setPlaybackSpeed(_ speed: Double) throws
@@ -1070,6 +1072,43 @@ class VideoPlayerInstanceApiSetup {
     messageChannelSuffix: String = ""
   ) {
     let channelSuffix = messageChannelSuffix.count > 0 ? ".\(messageChannelSuffix)" : ""
+    let loadUrlChannel = FlutterBasicMessageChannel(
+      name:
+        "dev.flutter.pigeon.video_player_avfoundation.VideoPlayerInstanceApi.loadUrl\(channelSuffix)",
+      binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      loadUrlChannel.setMessageHandler { message, reply in
+        let args = message as! [Any?]
+        let urlArg = args[0] as! String
+        let httpHeadersArg = args[1] as! [String: String]
+        Task { @MainActor in
+          do {
+            try await api.loadUrl(url: urlArg, httpHeaders: httpHeadersArg)
+            reply(wrapResult(nil))
+          } catch {
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      loadUrlChannel.setMessageHandler(nil)
+    }
+    let isPictureInPictureActiveChannel = FlutterBasicMessageChannel(
+      name:
+        "dev.flutter.pigeon.video_player_avfoundation.VideoPlayerInstanceApi.isPictureInPictureActive\(channelSuffix)",
+      binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      isPictureInPictureActiveChannel.setMessageHandler { _, reply in
+        do {
+          let result = try api.isPictureInPictureActive()
+          reply(wrapResult(result))
+        } catch {
+          reply(wrapError(error))
+        }
+      }
+    } else {
+      isPictureInPictureActiveChannel.setMessageHandler(nil)
+    }
     let setLoopingChannel = FlutterBasicMessageChannel(
       name:
         "dev.flutter.pigeon.video_player_avfoundation.VideoPlayerInstanceApi.setLooping\(channelSuffix)",

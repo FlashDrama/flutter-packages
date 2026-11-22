@@ -206,6 +206,9 @@ abstract class AndroidVideoPlayerApi {
 
 @HostApi()
 abstract class VideoPlayerInstanceApi {
+  void loadUrl(String url, Map<String, String> httpHeaders);
+  bool isPictureInPictureActive();
+
   /// Sets whether to automatically loop playback of the video.
   void setLooping(bool looping);
 

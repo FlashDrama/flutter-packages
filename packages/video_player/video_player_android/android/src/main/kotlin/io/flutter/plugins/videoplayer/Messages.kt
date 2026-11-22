@@ -1299,6 +1299,9 @@ interface AndroidVideoPlayerApi {
 }
 /** Generated interface from Pigeon that represents a handler of messages from Flutter. */
 interface VideoPlayerInstanceApi {
+  fun loadUrl(url: String, httpHeaders: Map<String, String>)
+
+  fun isPictureInPictureActive(): Boolean
   /** Sets whether to automatically loop playback of the video. */
   fun setLooping(looping: Boolean)
   /** Sets the volume, with 0.0 being muted and 1.0 being full volume. */
@@ -1344,6 +1347,50 @@ interface VideoPlayerInstanceApi {
     ) {
       val separatedMessageChannelSuffix =
           if (messageChannelSuffix.isNotEmpty()) ".$messageChannelSuffix" else ""
+      run {
+        val channel =
+            BasicMessageChannel<Any?>(
+                binaryMessenger,
+                "dev.flutter.pigeon.video_player_android.VideoPlayerInstanceApi.loadUrl$separatedMessageChannelSuffix",
+                codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val urlArg = args[0] as String
+            val httpHeadersArg = args[1] as Map<String, String>
+            val wrapped: List<Any?> =
+                try {
+                  api.loadUrl(urlArg, httpHeadersArg)
+                  listOf(null)
+                } catch (exception: Throwable) {
+                  MessagesPigeonUtils.wrapError(exception)
+                }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel =
+            BasicMessageChannel<Any?>(
+                binaryMessenger,
+                "dev.flutter.pigeon.video_player_android.VideoPlayerInstanceApi.isPictureInPictureActive$separatedMessageChannelSuffix",
+                codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            val wrapped: List<Any?> =
+                try {
+                  listOf(api.isPictureInPictureActive())
+                } catch (exception: Throwable) {
+                  MessagesPigeonUtils.wrapError(exception)
+                }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
       run {
         val channel =
             BasicMessageChannel<Any?>(

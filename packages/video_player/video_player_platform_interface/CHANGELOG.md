@@ -1,3 +1,7 @@
+## 6.9.0+flashdrama.1
+
+* Retains the loadUrl, urlLoaded and isPictureInPictureActive extensions.
+
 ## 6.9.0
 
 * Adds `backBufferDurationMs` to `VideoPlayerOptions` to support configuring the back buffer duration.

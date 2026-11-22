@@ -549,6 +549,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   List<Caption>? _sortedCaptions;
 
   Timer? _timer;
+  Completer<void>? _loadingUrl;
   bool _isDisposed = false;
   Completer<void>? _creatingCompleter;
   StreamSubscription<dynamic>? _eventSubscription;
@@ -633,6 +634,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
 
       switch (event.eventType) {
         case platform_interface.VideoEventType.initialized:
+        case platform_interface.VideoEventType.urlLoaded:
           value = value.copyWith(
             duration: event.duration,
             size: event.size,
@@ -641,6 +643,11 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
             errorDescription: null,
             isCompleted: false,
           );
+          if (event.eventType == platform_interface.VideoEventType.urlLoaded) {
+            _loadingUrl?.complete();
+            _loadingUrl = null;
+            break;
+          }
           assert(
             !initializingCompleter.isCompleted,
             'VideoPlayerController already initialized. This is typically a '
@@ -684,6 +691,8 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     }
 
     void errorListener(Object obj) {
+      _loadingUrl?.completeError(obj);
+      _loadingUrl = null;
       final e = obj as PlatformException;
       value = VideoPlayerValue.erroneous(e.message!);
       _timer?.cancel();
@@ -708,6 +717,10 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
       await _creatingCompleter!.future;
       if (!_isDisposed) {
         _isDisposed = true;
+        _loadingUrl?.completeError(
+          PlatformException(code: 'video_player', message: 'Player was disposed during loadUrl'),
+        );
+        _loadingUrl = null;
         _timer?.cancel();
         await _eventSubscription?.cancel();
         await _videoPlayerPlatform.dispose(_playerId);
@@ -717,6 +730,56 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     _isDisposed = true;
     super.dispose();
   }
+
+  /// Replaces the media on the existing native player and starts playback
+  /// once the new item is ready. Keeps volume, speed and looping settings.
+  Future<void> loadUrl(String url, {Map<String, String>? httpHeaders}) async {
+    if (_isDisposedOrNotInitialized) {
+      return;
+    }
+    _timer?.cancel();
+    final ready = Completer<void>();
+    _loadingUrl = ready;
+    value = value.copyWith(
+      duration: Duration.zero,
+      position: Duration.zero,
+      captionOffset: Duration.zero,
+      buffered: <platform_interface.DurationRange>[],
+      isInitialized: false,
+      isPlaying: false,
+      isBuffering: false,
+      isCompleted: false,
+    );
+    try {
+      // Listen for readiness before sending the command. Native events and
+      // method replies travel on different channels and may arrive in either order.
+      await Future.wait<void>(<Future<void>>[
+        ready.future,
+        _videoPlayerPlatform.loadUrl(_playerId, url, httpHeaders: httpHeaders),
+      ], eagerError: true);
+    } catch (error) {
+      if (!_isDisposed && identical(_loadingUrl, ready)) {
+        value = VideoPlayerValue.erroneous(error.toString());
+      }
+      rethrow;
+    } finally {
+      if (identical(_loadingUrl, ready)) {
+        _loadingUrl = null;
+      }
+    }
+    if (!_isDisposed) {
+      await _applyLooping();
+      await _applyVolume();
+    }
+    if (!_isDisposed && value.isInitialized) {
+      await play();
+    }
+  }
+
+  /// Returns whether the native platform view is currently in OS PiP.
+  Future<bool> isPictureInPictureActive() async =>
+      !_isDisposedOrNotInitialized &&
+      await _videoPlayerPlatform.isPictureInPictureActive(_playerId);
 
   /// Starts playing the video.
   ///

@@ -22,4 +22,7 @@
   return [[AVPlayerLayer alloc] init];
 }
 
+- (BOOL)isPictureInPictureActive {
+  return NO;
+}
 @end

@@ -1,3 +1,7 @@
+## 2.14.1+flashdrama.1
+
+* Retains in-place URL replacement, autoplay and picture-in-picture state queries.
+
 ## 2.14.1
 
 * Fixes late position updates after a controller is disposed.
