@@ -19,17 +19,20 @@ import androidx.media3.common.AudioAttributes;
 import androidx.media3.common.C;
 import androidx.media3.common.Format;
 import androidx.media3.common.MediaItem;
+import androidx.media3.common.MimeTypes;
 import androidx.media3.common.PlaybackParameters;
 import androidx.media3.common.Player;
 import androidx.media3.common.TrackGroup;
 import androidx.media3.common.TrackSelectionOverride;
 import androidx.media3.common.Tracks;
 import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.exoplayer.source.MediaSource;
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector;
 import com.google.common.collect.ImmutableList;
 import io.flutter.plugins.videoplayer.platformview.PlatformViewExoPlayerEventListener;
 import io.flutter.view.TextureRegistry.SurfaceProducer;
 import java.lang.reflect.Field;
+import java.util.Collections;
 import java.util.List;
 import kotlin.jvm.functions.Function0;
 import org.junit.Before;
@@ -100,6 +103,20 @@ public final class VideoPlayerTest {
   private VideoPlayer createVideoPlayer(VideoPlayerOptions options) {
     return new TestVideoPlayer(
         mockEvents, fakeVideoAsset.getMediaItem(), options, null, () -> mockExoPlayer);
+  }
+
+  @Test
+  public void replacesExtensionlessHlsWithTheOriginalFormatHint() {
+    MediaItem initial =
+        new MediaItem.Builder().setUri("https://example.org/one").setMimeType(MimeTypes.APPLICATION_M3U8).build();
+    VideoPlayer player = new TestVideoPlayer(
+        mockEvents, initial, new VideoPlayerOptions(), null, () -> mockExoPlayer);
+
+    player.loadUrl("https://example.org/two", Collections.emptyMap());
+
+    ArgumentCaptor<MediaSource> replacement = ArgumentCaptor.forClass(MediaSource.class);
+    verify(mockExoPlayer).setMediaSource(replacement.capture());
+    assertEquals(MimeTypes.APPLICATION_M3U8, replacement.getValue().getMediaItem().localConfiguration.mimeType);
   }
 
   @Test

@@ -44,6 +44,9 @@ constructor(
   private var exoPlayerEventListener: ExoPlayerEventListener?
   val exoPlayer: ExoPlayer = exoPlayerProvider()
 
+  @OptIn(UnstableApi::class)
+  private val sourceMimeType = mediaItem.localConfiguration?.mimeType
+
   private val mainHandler = Handler(Looper.getMainLooper())
   private var isDisposed = false
 
@@ -339,7 +342,9 @@ constructor(
   @OptIn(UnstableApi::class)
   override fun loadUrl(url: String, httpHeaders: Map<String, String>) {
     val asset = VideoAsset.fromRemoteUrl(url, VideoAsset.StreamingFormat.UNKNOWN, httpHeaders, null)
-    val source = asset.getMediaSourceFactory(context).createMediaSource(asset.mediaItem)
+    // Reuse the caller's format hint for signed URLs without a playlist extension.
+    val item = asset.mediaItem.buildUpon().setMimeType(sourceMimeType).build()
+    val source = asset.getMediaSourceFactory(context).createMediaSource(item)
     exoPlayer.pause()
     exoPlayerEventListener?.prepareForUrlLoad()
     exoPlayer.setMediaSource(source)
