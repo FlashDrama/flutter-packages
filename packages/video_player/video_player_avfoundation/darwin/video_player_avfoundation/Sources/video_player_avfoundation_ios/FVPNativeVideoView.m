@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#import "../video_player_avfoundation/include/video_player_avfoundation/FVPNativeVideoView.h"
+#import "../video_player_avfoundation_objc/include/video_player_avfoundation_objc/FVPNativeVideoView.h"
 
 #import <AVFoundation/AVFoundation.h>
 #import <AVKit/AVKit.h>
@@ -13,16 +13,16 @@
 
 @implementation FVPPlayerView
 + (Class)layerClass {
-  return [AVPlayerLayer class];
+  return AVPlayerLayer.class;
 }
 
 - (void)setPlayer:(AVPlayer *)player {
-  [(AVPlayerLayer *)[self layer] setPlayer:player];
+  ((AVPlayerLayer *)(self.layer)).player = player;
 }
 @end
 
 @interface FVPNativeVideoView ()
-@property(nonatomic) FVPPlayerView *playerView;
+@property(nonatomic, nonnull) FVPPlayerView *playerView;
 @property(nonatomic, strong) AVPictureInPictureController *pipController;
 @end
 
@@ -30,7 +30,7 @@
 - (instancetype)initWithPlayer:(AVPlayer *)player {
   if (self = [super init]) {
     _playerView = [[FVPPlayerView alloc] init];
-    [_playerView setPlayer:player];
+    _playerView.player = player;
 
     // Setup Picture-in-Picture for automatic background transition
     if (@available(iOS 14.2, *)) {
@@ -46,6 +46,7 @@
                  object:nil];
       }
     }
+
   }
   return self;
 }

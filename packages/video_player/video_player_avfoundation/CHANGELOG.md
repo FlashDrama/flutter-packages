@@ -1,8 +1,92 @@
-## NEXT
+## 2.12.4+flashdrama.1
 
-* Adds `isPictureInPictureActive` method to check if Picture-in-Picture mode is active (iOS only with platform views).
-* Adds `loadUrl` method to load a new video URL without disposing the player.
-* Stops Picture-in-Picture automatically when the app foregrounds, so returning via the icon, app switcher, or deep link tears down PiP through the standard `willStop` → `didStop` delegate sequence instead of leaving the floating window on top of the main UI (iOS only).
+* Retains inline iOS picture-in-picture, foreground restoration and in-place URL replacement.
+
+## 2.12.4
+
+* Converts internal event channel implementation to Swift.
+
+## 2.12.3
+
+* Fixes a potential crash when a player is disposed while an async method is in progress.
+
+## 2.12.2
+
+* Converts native player implementation to Swift.
+* Updates minimum supported SDK version to Flutter 3.47/Dart 3.13.
+
+## 2.12.1
+
+* Fixes a crash when a video track reports a zero `minFrameDuration`.
+* Updates minimum supported SDK version to Flutter 3.41/Dart 3.11.
+
+## 2.12.0
+
+* Routes video over AirPlay when an external screen is active, by setting
+  `usesExternalPlaybackWhileExternalScreenIsActive` on the `AVPlayer`. Selecting
+  an AirPlay route previously moved only the audio, leaving the video on the
+  device while the receiver showed a mirrored screen.
+
+## 2.11.1
+
+* Updates pigeon dev_dependency to ^27.3.2 for analyzer 14 compatibility.
+
+## 2.11.0
+
+* Implements `setPreventsDisplaySleepDuringVideoPlayback` using
+  `AVPlayer.preventsDisplaySleepDuringVideoPlayback`.
+
+## 2.10.0
+
+* Implements `getVideoTracks()` and `selectVideoTrack()` methods for video track (quality) selection using AVFoundation.
+* Video track selection requires iOS 15+ / macOS 12+ for HLS streams.
+
+## 2.9.7
+
+* Forces tone-mapping to SDR on iOS to prevent washed-out HDR video playback.
+
+## 2.9.6
+
+* Adds a Swift version to fix a potential build issue when using CocoaPods.
+
+## 2.9.5
+
+* Converts portions of the native code to Swift for improved maintainability.
+
+## 2.9.4
+
+* Ensures that the display link does not continue requesting frames after a player is disposed.
+
+## 2.9.3
+
+* Fixes a regression where HTTP headers were ignored.
+
+## 2.9.2
+
+* Refactors for improved testability.
+
+## 2.9.1
+
+* Refactors native code for improved testability.
+
+## 2.9.0
+
+* Implements `getAudioTracks()` and `selectAudioTrack()` methods.
+* Updates minimum supported SDK version to Flutter 3.29/Dart 3.7.
+
+## 2.8.10
+
+* Improves compatibility with `UIScene`.
+* Updates minimum supported SDK version to Flutter 3.38/Dart 3.10.
+
+## 2.8.9
+
+* Resolve `tracksWithMediaType:` deprecations.
+* Use `loadTracksWithMediaType:completionHandler:` for iOS 15.0+/macOS 12.0+.
+
+## 2.8.8
+
+* Refactors Dart internals for maintainability.
 
 ## 2.8.7
 
