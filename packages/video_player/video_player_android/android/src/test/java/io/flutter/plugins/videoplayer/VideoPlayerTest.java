@@ -108,15 +108,25 @@ public final class VideoPlayerTest {
   @Test
   public void replacesExtensionlessHlsWithTheOriginalFormatHint() {
     MediaItem initial =
-        new MediaItem.Builder().setUri("https://example.org/one").setMimeType(MimeTypes.APPLICATION_M3U8).build();
-    VideoPlayer player = new TestVideoPlayer(
-        mockEvents, initial, new VideoPlayerOptions(), null, () -> mockExoPlayer);
+        new MediaItem.Builder()
+            .setUri("https://example.org/one")
+            .setMimeType(MimeTypes.APPLICATION_M3U8)
+            .build();
+    VideoPlayer player =
+        new TestVideoPlayer(
+            mockEvents, initial, new VideoPlayerOptions(), null, () -> mockExoPlayer);
 
     player.loadUrl("https://example.org/two", Collections.emptyMap());
 
     ArgumentCaptor<MediaSource> replacement = ArgumentCaptor.forClass(MediaSource.class);
     verify(mockExoPlayer).setMediaSource(replacement.capture());
-    assertEquals(MimeTypes.APPLICATION_M3U8, replacement.getValue().getMediaItem().localConfiguration.mimeType);
+    assertEquals(
+        MimeTypes.APPLICATION_M3U8,
+        replacement.getValue().getMediaItem().localConfiguration.mimeType);
+
+    player.loadUrl("https://example.org/trailer.mp4", Collections.emptyMap());
+    verify(mockExoPlayer, times(2)).setMediaSource(replacement.capture());
+    assertNull(replacement.getValue().getMediaItem().localConfiguration.mimeType);
   }
 
   @Test

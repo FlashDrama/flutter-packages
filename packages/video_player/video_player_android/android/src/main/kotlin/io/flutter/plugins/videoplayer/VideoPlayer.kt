@@ -9,12 +9,14 @@ import android.os.Looper
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.media3.common.FileTypes
 import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.common.util.Util
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import io.flutter.view.TextureRegistry.SurfaceProducer
@@ -44,8 +46,7 @@ constructor(
   private var exoPlayerEventListener: ExoPlayerEventListener?
   val exoPlayer: ExoPlayer = exoPlayerProvider()
 
-  @OptIn(UnstableApi::class)
-  private val sourceMimeType = mediaItem.localConfiguration?.mimeType
+  @OptIn(UnstableApi::class) private val sourceMimeType = mediaItem.localConfiguration?.mimeType
 
   private val mainHandler = Handler(Looper.getMainLooper())
   private var isDisposed = false
@@ -342,8 +343,17 @@ constructor(
   @OptIn(UnstableApi::class)
   override fun loadUrl(url: String, httpHeaders: Map<String, String>) {
     val asset = VideoAsset.fromRemoteUrl(url, VideoAsset.StreamingFormat.UNKNOWN, httpHeaders, null)
-    // Reuse the caller's format hint for signed URLs without a playlist extension.
-    val item = asset.mediaItem.buildUpon().setMimeType(sourceMimeType).build()
+    val uri = asset.mediaItem.localConfiguration!!.uri
+    // An opaque episode URL needs the original hint. A recognizable replacement can change
+    // formats.
+    val item =
+        if (sourceMimeType != null &&
+            Util.inferContentType(uri) == C.CONTENT_TYPE_OTHER &&
+            FileTypes.inferFileTypeFromUri(uri) == FileTypes.UNKNOWN) {
+          asset.mediaItem.buildUpon().setMimeType(sourceMimeType).build()
+        } else {
+          asset.mediaItem
+        }
     val source = asset.getMediaSourceFactory(context).createMediaSource(item)
     exoPlayer.pause()
     exoPlayerEventListener?.prepareForUrlLoad()
